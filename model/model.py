@@ -6,7 +6,10 @@ import torch.nn as nn
 import os
 import model.networks as networks
 from .base_model import BaseModel
+from torch.cuda.amp import autocast as autocast
+
 logger = logging.getLogger('base')
+scaler = torch.cuda.amp.GradScaler()
 
 
 class DDPM(BaseModel):
@@ -40,19 +43,26 @@ class DDPM(BaseModel):
                 optim_params, lr=opt['train']["optimizer"]["lr"])
             self.log_dict = OrderedDict()
         self.load_network()
-        self.print_network()
+        # self.print_network()
 
     def feed_data(self, data):
         self.data = self.set_device(data)
 
     def optimize_parameters(self):
         self.optG.zero_grad()
-        l_pix = self.netG(self.data)
-        # need to average in multi-gpu
-        b, c, h, w = self.data['HR'].shape
-        l_pix = l_pix.sum()/int(b*c*h*w)
-        l_pix.backward()
-        self.optG.step()
+
+        with autocast(dtype=torch.float16):
+            l_pix = self.netG(self.data)
+            # need to average in multi-gpu
+            b, c, h, w = self.data['HR'].shape
+            l_pix = l_pix.sum()/int(b*c*h*w)
+
+        scaler.scale(l_pix).backward()
+        scaler.step(self.optG)
+        scaler.update()
+
+        # l_pix.backward()
+        # self.optG.step()
 
         # set log
         self.log_dict['l_pix'] = l_pix.item()

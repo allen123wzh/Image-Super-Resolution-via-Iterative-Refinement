@@ -9,14 +9,27 @@ from core.wandb_logger import WandbLogger
 from tensorboardX import SummaryWriter
 import os
 import numpy as np
+import random
+
+def set_seed(seed: int = 42) -> None:
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    # When running on the CuDNN backend, two further options must be set
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # Set a fixed value for the hash seed
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    print(f"Random seed set as {seed}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/sr_sr3_16_128.json',
+    parser.add_argument('-c', '--config', type=str, default='config/sr_sr3_64_512.json',
                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
-    parser.add_argument('-gpu', '--gpu_ids', type=str, default=None)
+    parser.add_argument('-gpu', '--gpu_ids', type=str, default="0")
     parser.add_argument('-debug', '-d', action='store_true')
     parser.add_argument('-enable_wandb', action='store_true')
     parser.add_argument('-log_wandb_ckpt', action='store_true')
@@ -29,14 +42,16 @@ if __name__ == "__main__":
     opt = Logger.dict_to_nonedict(opt)
 
     # logging
-    torch.backends.cudnn.enabled = True
-    torch.backends.cudnn.benchmark = True
+    # torch.backends.cudnn.enabled = True
+    # torch.backends.cudnn.benchmark = True
+
+    set_seed(42)
 
     Logger.setup_logger(None, opt['path']['log'],
                         'train', level=logging.INFO, screen=True)
     Logger.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
-    logger.info(Logger.dict2str(opt))
+    # logger.info(Logger.dict2str(opt))
     tb_logger = SummaryWriter(log_dir=opt['path']['tb_logger'])
 
     # Initialize WandbLogger
@@ -229,7 +244,7 @@ if __name__ == "__main__":
         logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
         logger.info('# Validation # SSIM: {:.4e}'.format(avg_ssim))
         logger_val = logging.getLogger('val')  # validation logger
-        logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}, ssim：{:.4e}'.format(
+        logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}, ssim: {:.4e}'.format(
             current_epoch, current_step, avg_psnr, avg_ssim))
 
         if wandb_logger:

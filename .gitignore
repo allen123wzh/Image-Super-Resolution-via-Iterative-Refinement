@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+dataset/
 experiments/*
 build/
 develop-eggs/
@@ -130,3 +131,6 @@ dmypy.json
 .pyre/
 
 *.lmdb
+
+# weights
+*.pth
