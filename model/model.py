@@ -11,7 +11,6 @@ from torch.cuda.amp import autocast as autocast
 logger = logging.getLogger('base')
 scaler = torch.cuda.amp.GradScaler()
 
-
 class DDPM(BaseModel):
     def __init__(self, opt):
         super(DDPM, self).__init__(opt)

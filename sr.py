@@ -18,18 +18,18 @@ def set_seed(seed: int = 42) -> None:
     torch.cuda.manual_seed(seed)
     # When running on the CuDNN backend, two further options must be set
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.benchmark = True
     # Set a fixed value for the hash seed
     os.environ["PYTHONHASHSEED"] = str(seed)
     print(f"Random seed set as {seed}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/sr_sr3_64_512.json',
+    parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_512_512.json',
                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
-    parser.add_argument('-gpu', '--gpu_ids', type=str, default="0")
+    parser.add_argument('-gpu', '--gpu_ids', type=str, default="0,1,2,3")
     parser.add_argument('-debug', '-d', action='store_true')
     parser.add_argument('-enable_wandb', action='store_true')
     parser.add_argument('-log_wandb_ckpt', action='store_true')
@@ -51,7 +51,7 @@ if __name__ == "__main__":
                         'train', level=logging.INFO, screen=True)
     Logger.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
     logger = logging.getLogger('base')
-    # logger.info(Logger.dict2str(opt))
+    logger.info(Logger.dict2str(opt))
     tb_logger = SummaryWriter(log_dir=opt['path']['tb_logger'])
 
     # Initialize WandbLogger
@@ -224,8 +224,8 @@ if __name__ == "__main__":
                 hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
             Metrics.save_img(
                 lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
-            Metrics.save_img(
-                fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
+            # Metrics.save_img(
+            #     fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
 
             # generation
             eval_psnr = Metrics.calculate_psnr(Metrics.tensor2img(visuals['SR'][-1]), hr_img)

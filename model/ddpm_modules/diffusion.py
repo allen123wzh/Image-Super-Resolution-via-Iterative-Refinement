@@ -83,7 +83,8 @@ class GaussianDiffusion(nn.Module):
         channels=3,
         loss_type='l1',
         conditional=True,
-        schedule_opt=None
+        schedule_opt=None,
+        global_corrector=None,
     ):
         super().__init__()
         self.channels = channels
@@ -172,12 +173,19 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def p_mean_variance(self, x, t, clip_denoised: bool, condition_x=None):
+
+
         if condition_x is not None:
             x_recon = self.predict_start_from_noise(
                 x, t=t, noise=self.denoise_fn(torch.cat([condition_x, x], dim=1), t))
         else:
             x_recon = self.predict_start_from_noise(
                 x, t=t, noise=self.denoise_fn(x, t))
+        
+        ####################################################
+        ####################################################
+        ####################################################
+
 
         if clip_denoised:
             x_recon.clamp_(-1., 1.)
