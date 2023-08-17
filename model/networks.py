@@ -5,11 +5,10 @@ import torch.nn as nn
 from torch.nn import init
 from torch.nn import modules
 logger = logging.getLogger('base')
+
 ####################
 # initialize
 ####################
-
-
 def weights_init_normal(m, std=0.02):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -88,6 +87,7 @@ def define_G(opt):
         from .sr3_modules import diffusion, unet, global_corrector
     if ('norm_groups' not in model_opt['unet']) or model_opt['unet']['norm_groups'] is None:
         model_opt['unet']['norm_groups']=32
+    
     model = unet.UNet(
         in_channel=model_opt['unet']['in_channel'],
         out_channel=model_opt['unet']['out_channel'],
@@ -100,7 +100,7 @@ def define_G(opt):
         image_size=model_opt['diffusion']['image_size']
     )
 
-
+    gc = global_corrector.GlobalCorrector(normal01=True)
 
     netG = diffusion.GaussianDiffusion(
         model,
@@ -108,7 +108,8 @@ def define_G(opt):
         channels=model_opt['diffusion']['channels'],
         loss_type='l1',    # L1 or L2
         conditional=model_opt['diffusion']['conditional'],
-        schedule_opt=model_opt['beta_schedule']['train']
+        schedule_opt=model_opt['beta_schedule']['train'],
+        global_corrector=gc
     )
     if opt['phase'] == 'train':
         # init_weights(netG, init_type='kaiming', scale=0.1)

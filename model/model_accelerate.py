@@ -11,13 +11,17 @@ from torch.cuda.amp import autocast as autocast
 from accelerate import Accelerator
 
 logger = logging.getLogger('base')
-scaler = torch.cuda.amp.GradScaler()
+# scaler = torch.cuda.amp.GradScaler()
+accelerator=Accelerator(mixed_precision="fp16")
+device = accelerator.device
 
 class DDPM(BaseModel):
     def __init__(self, opt):
         super(DDPM, self).__init__(opt)
         # define network and load pretrained models
-        self.netG = self.set_device(networks.define_G(opt))
+        #  self.netG = self.set_device(networks.define_G(opt))
+        self.netG = networks.define_G(opt).to(device)
+
         self.schedule_phase = None
 
         # set loss and load resume state
@@ -38,73 +42,42 @@ class DDPM(BaseModel):
                         logger.info(
                             'Params [{:s}] initialized to 0 and will optimize.'.format(k))
             else:
-                ##########################
-                ##########################
-                ##########################
                 optim_params = list(self.netG.parameters())
-
-            #     optim_params1 = list(self.netG.denoise_fn.parameters())
-            #     optim_params2 = list(self.netG.global_corrector.parameters())
-
-
-            # self.optG1 = torch.optim.Adam(
-            #     optim_params1, lr=opt['train']["optimizer"]["lr"])
-            
-            # self.optG2 = torch.optim.Adam(
-            #     optim_params2, lr=opt['train']["optimizer"]["lr"])
 
             self.optG = torch.optim.Adam(
                 optim_params, lr=opt['train']["optimizer"]["lr"])
-            
-            self.tot_loss_noise = 0
-            self.tot_loss_recon = 0
-
-                ##########################
-                ##########################
-                ##########################
-
-
             self.log_dict = OrderedDict()
         self.load_network()
         self.print_network()
 
     def feed_data(self, data):
-        self.data = self.set_device(data)
+        # self.data = self.set_device(data)
+        self.data = data
 
-    def optimize_parameters(self, it=None, grad_accum=1):
-        
-        
-        ##########################
-        ##########################
-        ##########################
-        with autocast(dtype=torch.float16):
-            l_noise, l_recon = self.netG(self.data)
-            # need to average in multi-gpu
-            b, c, h, w = self.data['HR'].shape
+    def optimize_parameters(self):
+        self.optG.zero_grad()
 
-            l_noise = l_noise.sum()/int(b*c*h*w)
-            l_recon = l_recon.sum()/int(b*c*h*w)
+        l_pix = self.netG(self.data)
+        b, c, h, w = self.data['HR'].shape
+        l_pix = l_pix.sum()/int(b*c*h*w)
+        accelerator.backward(l_pix)
+        self.optG.step()
 
-            scaler.scale(l_noise).backward()
-            scaler.scale(l_recon).backward()
+        # with autocast(dtype=torch.float16):
+        #     l_pix = self.netG(self.data)
+        #     # need to average in multi-gpu
+        #     b, c, h, w = self.data['HR'].shape
+        #     l_pix = l_pix.sum()/int(b*c*h*w)
 
-            if it % grad_accum == 0:
-                scaler.step(self.optG)
-                scaler.update()
-                self.optG.zero_grad()
-            
-            # set log
-            self.log_dict['l_noise'] = l_noise.item()
-            self.log_dict['l_recon'] = l_recon.item()
-        #########################
-        ##########################
-        ##########################
+        # scaler.scale(l_pix).backward()
+        # scaler.step(self.optG)
+        # scaler.update()
 
         # l_pix.backward()
         # self.optG.step()
 
         # set log
-        # self.log_dict['l_pix'] = l_pix.item()
+        self.log_dict['l_pix'] = l_pix.item()
 
     def test(self, continous=False):
         self.netG.eval()

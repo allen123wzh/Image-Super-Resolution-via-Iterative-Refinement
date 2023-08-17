@@ -11,6 +11,13 @@ import os
 import numpy as np
 import random
 
+from accelerate import Accelerator
+accelerator=Accelerator(mixed_precision="fp16")
+
+use_accelerate = False
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+
 def set_seed(seed: int = 42) -> None:
     np.random.seed(seed)
     random.seed(seed)
@@ -25,7 +32,7 @@ def set_seed(seed: int = 42) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_512_512.json',
+    parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_256_256.json',
                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
@@ -92,6 +99,13 @@ if __name__ == "__main__":
 
     diffusion.set_new_noise_schedule(
         opt['model']['beta_schedule'][opt['phase']], schedule_phase=opt['phase'])
+    
+    ### HF Acclerate
+    if use_accelerate:
+        diffusion.netG, diffusion.optG, train_loader = accelerator.prepare(
+            diffusion.netG, diffusion.optG, train_loader
+        )
+
     if opt['phase'] == 'train':
         while current_step < n_iter:
             current_epoch += 1
@@ -99,8 +113,9 @@ if __name__ == "__main__":
                 current_step += 1
                 if current_step > n_iter:
                     break
+                
                 diffusion.feed_data(train_data)
-                diffusion.optimize_parameters()
+                diffusion.optimize_parameters(current_step, grad_accum=4)
                 # log
                 if current_step % opt['train']['print_freq'] == 0:
                     logs = diffusion.get_current_log()

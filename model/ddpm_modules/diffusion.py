@@ -95,6 +95,8 @@ class GaussianDiffusion(nn.Module):
         if schedule_opt is not None:
             pass
             # self.set_new_noise_schedule(schedule_opt)
+        if global_corrector is not None:
+            self.global_corrector = global_corrector
 
     def set_loss(self, device):
         if self.loss_type == 'l1':
@@ -174,18 +176,24 @@ class GaussianDiffusion(nn.Module):
 
     def p_mean_variance(self, x, t, clip_denoised: bool, condition_x=None):
 
-
         if condition_x is not None:
             x_recon = self.predict_start_from_noise(
                 x, t=t, noise=self.denoise_fn(torch.cat([condition_x, x], dim=1), t))
         else:
             x_recon = self.predict_start_from_noise(
                 x, t=t, noise=self.denoise_fn(x, t))
-        
-        ####################################################
-        ####################################################
-        ####################################################
 
+        ####################################################
+        ####################################################
+        ####################################################
+        if clip_denoised:
+            x_recon.clamp_(-1., 1.)
+
+        if self.global_corrector is not None:
+            x_recon = self.global_corrector(x_recon, t)
+        ####################################################
+        ####################################################
+        ####################################################
 
         if clip_denoised:
             x_recon.clamp_(-1., 1.)
@@ -293,13 +301,40 @@ class GaussianDiffusion(nn.Module):
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
         if not self.conditional:
-            x_recon = self.denoise_fn(x_noisy, t)
+            predicted_noise = self.denoise_fn(x_noisy, t)
         else:
-            x_recon = self.denoise_fn(
+            predicted_noise = self.denoise_fn(
                 torch.cat([x_in['SR'], x_noisy], dim=1), t)
-        loss = self.loss_func(noise, x_recon)
 
-        return loss
+        ####################################################
+        ####################################################
+        ####################################################
+        l_noise = self.loss_func(noise, predicted_noise)
+        
+        if self.global_corrector is not None:
+            if not self.conditional:
+                x_recon = self.predict_start_from_noise(
+                    x_noisy, t=t, noise=self.denoise_fn(x_noisy, t))
+            else:
+                x_recon = self.predict_start_from_noise(
+                    x_noisy, t=t, noise=self.denoise_fn(torch.cat([x_in['SR'], x_noisy], dim=1), t))
+            
+            x_recon.clamp_(-1., 1.)
+            x_recon = self.global_corrector(x_recon, t)
+            x_recon.clamp_(-1., 1.)
+
+            l_recon = self.loss_func(x_recon, x_start)
+
+            return l_noise, l_recon
+        else:
+            return l_noise
+        ####################################################
+        ####################################################
+        ####################################################        
+
+        # loss = self.loss_func(noise, x_recon)
+
+        # return l_noise, l_recon
 
     def forward(self, x, *args, **kwargs):
         return self.p_losses(x, *args, **kwargs)
