@@ -88,7 +88,7 @@ def define_G(opt):
     if ('norm_groups' not in model_opt['unet']) or model_opt['unet']['norm_groups'] is None:
         model_opt['unet']['norm_groups']=32
     
-    model = unet.UNet(
+    denoise_fn = unet.UNet(
         in_channel=model_opt['unet']['in_channel'],
         out_channel=model_opt['unet']['out_channel'],
         norm_groups=model_opt['unet']['norm_groups'],
@@ -103,7 +103,7 @@ def define_G(opt):
     gc = global_corrector.GlobalCorrector(normal01=True)
 
     netG = diffusion.GaussianDiffusion(
-        model,
+        denoise_fn=denoise_fn,
         image_size=model_opt['diffusion']['image_size'],
         channels=model_opt['diffusion']['channels'],
         loss_type='l1',    # L1 or L2
@@ -116,5 +116,7 @@ def define_G(opt):
         init_weights(netG, init_type='orthogonal')
     if opt['gpu_ids'] and opt['distributed']:
         assert torch.cuda.is_available()
-        netG = nn.DataParallel(netG)
+        # netG = nn.DataParallel(netG)
+        netG.denoise_fn = nn.DataParallel(netG.denoise_fn)
+        netG.global_corrector = nn.DataParallel(netG.global_corrector)
     return netG

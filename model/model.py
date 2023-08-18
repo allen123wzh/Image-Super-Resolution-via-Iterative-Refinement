@@ -41,23 +41,19 @@ class DDPM(BaseModel):
                 ##########################
                 ##########################
                 ##########################
-                optim_params = list(self.netG.parameters())
+                # optim_params = list(self.netG.parameters())
 
-            #     optim_params1 = list(self.netG.denoise_fn.parameters())
-            #     optim_params2 = list(self.netG.global_corrector.parameters())
+                optim_params1 = list(self.netG.denoise_fn.parameters())
+                optim_params2 = list(self.netG.global_corrector.parameters())
 
+            # self.optG = torch.optim.Adam(
+            #     optim_params, lr=opt['train']["optimizer"]["lr"])
 
-            # self.optG1 = torch.optim.Adam(
-            #     optim_params1, lr=opt['train']["optimizer"]["lr"])
+            self.optG1 = torch.optim.Adam(
+                optim_params1, lr=opt['train']["optimizer"]["lr"])
             
-            # self.optG2 = torch.optim.Adam(
-            #     optim_params2, lr=opt['train']["optimizer"]["lr"])
-
-            self.optG = torch.optim.Adam(
-                optim_params, lr=opt['train']["optimizer"]["lr"])
-            
-            self.tot_loss_noise = 0
-            self.tot_loss_recon = 0
+            self.optG2 = torch.optim.Adam(
+                optim_params2, lr=opt['train']["optimizer"]["lr"])
 
                 ##########################
                 ##########################
@@ -89,9 +85,13 @@ class DDPM(BaseModel):
             scaler.scale(l_recon).backward()
 
             if it % grad_accum == 0:
-                scaler.step(self.optG)
+                # scaler.step(self.optG)
+                scaler.step(self.optG1)
+                scaler.step(self.optG2)
                 scaler.update()
-                self.optG.zero_grad()
+                # self.optG.zero_grad()
+                self.optG1.zero_grad()
+                self.optG2.zero_grad()
             
             # set log
             self.log_dict['l_noise'] = l_noise.item()
@@ -171,28 +171,72 @@ class DDPM(BaseModel):
         logger.info(s)
 
     def save_network(self, epoch, iter_step):
+        # gen_path = os.path.join(
+        #     self.opt['path']['checkpoint'], 'I{}_E{}_gen.pth'.format(iter_step, epoch))
+        # opt_path = os.path.join(
+        #     self.opt['path']['checkpoint'], 'I{}_E{}_opt.pth'.format(iter_step, epoch))
+        # # gen
+        # network = self.netG
+        # if isinstance(self.netG, nn.DataParallel):
+        #     network = network.module
+        # state_dict = network.state_dict()
+        # for key, param in state_dict.items():
+        #     state_dict[key] = param.cpu()
+        # torch.save(state_dict, gen_path)
+        # # opt
+        # opt_state = {'epoch': epoch, 'iter': iter_step,
+        #              'scheduler': None, 'optimizer': None}
+        # opt_state['optimizer'] = self.optG.state_dict()
+        # torch.save(opt_state, opt_path)
+
+        # logger.info(
+        #     'Saved model in [{:s}] ...'.format(gen_path))
+        
         gen_path = os.path.join(
             self.opt['path']['checkpoint'], 'I{}_E{}_gen.pth'.format(iter_step, epoch))
         opt_path = os.path.join(
             self.opt['path']['checkpoint'], 'I{}_E{}_opt.pth'.format(iter_step, epoch))
         # gen
         network = self.netG
-        if isinstance(self.netG, nn.DataParallel):
-            network = network.module
+        # if isinstance(self.netG.denoise_fn, nn.DataParallel) or isinstance(self.netG.global_corrector, nn.DataParallel):
+        #     network.denoise_fn = network.denoise_fn.module
+        #     network.global_corrector = network.global_corrector.module
         state_dict = network.state_dict()
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()
         torch.save(state_dict, gen_path)
         # opt
-        opt_state = {'epoch': epoch, 'iter': iter_step,
-                     'scheduler': None, 'optimizer': None}
-        opt_state['optimizer'] = self.optG.state_dict()
+        opt_state = {'epoch': epoch, 'iter': iter_step, 'scheduler': None,
+                     'optimizer1': None, 'optimizer2': None}
+        opt_state['optimizer1'] = self.optG1.state_dict()
+        opt_state['optimizer2'] = self.optG2.state_dict()
+
         torch.save(opt_state, opt_path)
 
         logger.info(
             'Saved model in [{:s}] ...'.format(gen_path))
 
     def load_network(self):
+        # load_path = self.opt['path']['resume_state']
+        # if load_path is not None:
+        #     logger.info(
+        #         'Loading pretrained model for G [{:s}] ...'.format(load_path))
+        #     gen_path = '{}_gen.pth'.format(load_path)
+        #     opt_path = '{}_opt.pth'.format(load_path)
+        #     # gen
+        #     network = self.netG
+        #     if isinstance(self.netG, nn.DataParallel):
+        #         network = network.module
+        #     network.load_state_dict(torch.load(
+        #         gen_path), strict=(not self.opt['model']['finetune_norm']))
+        #     # network.load_state_dict(torch.load(
+        #     #     gen_path), strict=False)
+        #     if self.opt['phase'] == 'train':
+        #         # optimizer
+        #         opt = torch.load(opt_path)
+        #         self.optG.load_state_dict(opt['optimizer'])
+        #         self.begin_step = opt['iter']
+        #         self.begin_epoch = opt['epoch']
         load_path = self.opt['path']['resume_state']
         if load_path is not None:
             logger.info(
@@ -201,8 +245,9 @@ class DDPM(BaseModel):
             opt_path = '{}_opt.pth'.format(load_path)
             # gen
             network = self.netG
-            if isinstance(self.netG, nn.DataParallel):
-                network = network.module
+            # if isinstance(self.netG.denoise_fn, nn.DataParallel) or isinstance(self.netG.global_corrector, nn.DataParallel):
+            #     network.denoise_fn = network.denoise_fn.module
+            #     network.global_corrector = network.global_corrector.module
             network.load_state_dict(torch.load(
                 gen_path), strict=(not self.opt['model']['finetune_norm']))
             # network.load_state_dict(torch.load(
@@ -210,6 +255,9 @@ class DDPM(BaseModel):
             if self.opt['phase'] == 'train':
                 # optimizer
                 opt = torch.load(opt_path)
-                self.optG.load_state_dict(opt['optimizer'])
+
+                self.optG1.load_state_dict(opt['optimizer1'])
+                self.optG2.load_state_dict(opt['optimizer2'])
+
                 self.begin_step = opt['iter']
                 self.begin_epoch = opt['epoch']
