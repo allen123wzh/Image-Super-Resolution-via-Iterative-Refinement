@@ -1,24 +1,25 @@
 {
-    "name": "ll_gc_hiseq_256_g1_1.2",
+    //"name": "ll_gc_256_g1_1.2",
+    "name": "debug",
     "phase": "train", // train or val
-    "gpu_ids": [0,1,2,3],
+    "gpu_ids": [1],
     "path": { //set the path
         "log": "logs",
         "tb_logger": "tb_logger",
         "results": "results",
         "checkpoint": "checkpoint",
-        //"resume_state": null
-        "resume_state": "I7500_E6" //pretrain model or training state
+        "resume_state": null
+        //"resume_state": "I2500_E1" //pretrain model or training state
     },
     "datasets": {
         "train": {
             "name": "FFHQ",
             "mode": "HR", // whether need LR img
-            "dataroot": "dataset/dark/ffhq_256_256_gamma_1_1.2",
+            "dataroot": "dataset/dark/ffhq_256_256_gamma_1.5_1.7",
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 256, // low resolution need to super_resolution
             "r_resolution": 256, // high resolution
-            "batch_size": 56,
+            "batch_size": 14,
             "num_workers": 8,
 
             "use_shuffle": true,
@@ -27,7 +28,7 @@
         "val": {
             "name": "CelebaHQ",
             "mode": "LRHR",
-            "dataroot": "dataset/dark/celebahq_256_256_gamma_1_1.2",
+            "dataroot": "dataset/dark/celebahq_256_256_gamma_1.5_1.7",
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 256,
             "r_resolution": 256,
@@ -79,12 +80,12 @@
     },
     "train": {
         "n_iter": 1000000, //1000000
-        "val_freq": 2500,   //2500
-        "save_checkpoint_freq": 2500, //2500
-        "print_freq": 250,
+        "val_freq": 2,   //2500
+        "save_checkpoint_freq": 2, //2500
+        "print_freq": 1,
         "optimizer": {
             "type": "adam",
-            "lr": 1e-5
+            "lr": 5e-5
         },
         "ema_scheduler": { // not used now
             "step_start_ema": 5000,

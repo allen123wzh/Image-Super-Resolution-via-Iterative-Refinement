@@ -16,8 +16,6 @@ accelerator=Accelerator(mixed_precision="fp16")
 
 use_accelerate = False
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
-
 def set_seed(seed: int = 42) -> None:
     np.random.seed(seed)
     random.seed(seed)
@@ -34,9 +32,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_256_256.json',
                         help='JSON file for configuration')
+    # parser.add_argument('-c', '--config', type=str, default='config/debug.json',
+    #                     help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
-    parser.add_argument('-gpu', '--gpu_ids', type=str, default="0,1,2,3")
     parser.add_argument('-debug', '-d', action='store_true')
     parser.add_argument('-enable_wandb', action='store_true')
     parser.add_argument('-log_wandb_ckpt', action='store_true')
@@ -115,7 +114,7 @@ if __name__ == "__main__":
                     break
                 
                 diffusion.feed_data(train_data)
-                diffusion.optimize_parameters(current_step, grad_accum=4)
+                diffusion.optimize_parameters(current_step, grad_accum=2)
                 # log
                 if current_step % opt['train']['print_freq'] == 0:
                     logs = diffusion.get_current_log()
@@ -144,10 +143,11 @@ if __name__ == "__main__":
                         diffusion.feed_data(val_data)
                         diffusion.test(continous=False)
                         visuals = diffusion.get_current_visuals()
-                        sr_img = Metrics.tensor2img(visuals['SR'])  # uint8
-                        hr_img = Metrics.tensor2img(visuals['HR'])  # uint8
-                        lr_img = Metrics.tensor2img(visuals['LR'])  # uint8
-                        fake_img = Metrics.tensor2img(visuals['INF'])  # uint8
+                        sr_img = Metrics.tensor2img(visuals['SR'])  # uint8, super-res img
+                        hr_img = Metrics.tensor2img(visuals['HR'])  # uint8, GT hi-res
+                        lr_img = Metrics.tensor2img(visuals['LR'])  # uint8, Orig low-rs
+                        fake_img = Metrics.tensor2img(visuals['INF'])  # uint8, inference input
+                                                                       # upsampled/his-eq
 
                         # generation
                         # Metrics.save_img(

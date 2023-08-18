@@ -4,7 +4,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 import random
 import data.util as Util
-
+import torchvision.transforms as T
 
 class LRHRDataset(Dataset):
     def __init__(self, dataroot, datatype, l_resolution=16, r_resolution=128, split='train', data_len=-1, need_LR=False):
@@ -85,15 +85,36 @@ class LRHRDataset(Dataset):
                 if self.need_LR:
                     img_LR = Image.open(BytesIO(lr_img_bytes)).convert("RGB")
         else:
-            img_HR = Image.open(self.hr_path[index]).convert("RGB")
-            img_SR = Image.open(self.sr_path[index]).convert("RGB")
+            img_HR = Image.open(self.hr_path[index]).convert("RGB")  # HR img
+            img_SR = Image.open(self.sr_path[index]).convert("RGB")  # LR upsample to HR img
+                                                                     # apply hiseq to SR
+            #######################
+            #######################
+            #######################
+            img_hiseq = T.functional.equalize(img_SR)
             if self.need_LR:
                 img_LR = Image.open(self.lr_path[index]).convert("RGB")
+
         if self.need_LR:
-            [img_LR, img_SR, img_HR] = Util.transform_augment(
-                [img_LR, img_SR, img_HR], split=self.split, min_max=(-1, 1))
-            return {'LR': img_LR, 'HR': img_HR, 'SR': img_SR, 'Index': index}
+            [img_LR, img_SR, img_HR, img_hiseq] = Util.transform_augment(
+                [img_LR, img_SR, img_HR, img_hiseq], split=self.split, min_max=(-1, 1))
+            return {'LR': img_LR, 'HR': img_HR, 'SR': img_hiseq, 'Index': index}
+            # return {'LR': img_LR, 'HR': img_HR, 'SR': img_SR, 'hiseq': img_hiseq, 'Index': index}
         else:
-            [img_SR, img_HR] = Util.transform_augment(
-                [img_SR, img_HR], split=self.split, min_max=(-1, 1))
-            return {'HR': img_HR, 'SR': img_SR, 'Index': index}
+            [img_SR, img_HR, img_hiseq] = Util.transform_augment(
+                [img_SR, img_HR, img_hiseq], split=self.split, min_max=(-1, 1))
+            return {'HR': img_HR, 'SR': img_hiseq, 'Index': index}
+            # return {'HR': img_HR, 'SR': img_SR, 'hiseq': img_hiseq, 'Index': index}
+            #######################
+            #######################
+            #######################
+
+
+        # if self.need_LR:
+        #     [img_LR, img_SR, img_HR, ] = Util.transform_augment(
+        #         [img_LR, img_SR, img_HR], split=self.split, min_max=(-1, 1))
+        #     return {'LR': img_LR, 'HR': img_HR, 'SR': img_SR, 'Index': index}
+        # else:
+        #     [img_SR, img_HR] = Util.transform_augment(
+        #         [img_SR, img_HR], split=self.split, min_max=(-1, 1))
+        #     return {'HR': img_HR, 'SR': img_SR, 'Index': index}

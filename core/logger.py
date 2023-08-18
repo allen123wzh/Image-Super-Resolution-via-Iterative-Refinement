@@ -21,7 +21,7 @@ def get_timestamp():
 def parse(args):
     phase = args.phase
     opt_path = args.config
-    gpu_ids = args.gpu_ids
+    # gpu_ids = args.gpu_ids
     enable_wandb = args.enable_wandb
     # remove comments starting with '//'
     json_str = ''
@@ -46,11 +46,12 @@ def parse(args):
     opt['phase'] = phase
 
     # export CUDA_VISIBLE_DEVICES
-    if gpu_ids is not None:
-        opt['gpu_ids'] = [int(id) for id in gpu_ids.split(',')]
-        gpu_list = gpu_ids
-    else:
-        gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
+    # if gpu_ids is not None:
+    #     opt['gpu_ids'] = [int(id) for id in gpu_ids.split(',')]
+    #     gpu_list = gpu_ids
+    # else:
+    #     gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
+    gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
     print('export CUDA_VISIBLE_DEVICES=' + gpu_list)
     if len(gpu_list) > 1:
@@ -58,20 +59,20 @@ def parse(args):
     else:
         opt['distributed'] = False
 
-    # debug
-    if 'debug' in opt['name']:
-        opt['train']['val_freq'] = 2
-        opt['train']['print_freq'] = 2
-        opt['train']['save_checkpoint_freq'] = 3
-        opt['datasets']['train']['batch_size'] = 2
-        opt['model']['beta_schedule']['train']['n_timestep'] = 10
-        opt['model']['beta_schedule']['val']['n_timestep'] = 10
-        opt['datasets']['train']['data_len'] = 6
-        opt['datasets']['val']['data_len'] = 3
+    # # debug
+    # if 'debug' in opt['name']:
+    #     opt['train']['val_freq'] = 2
+    #     opt['train']['print_freq'] = 2
+    #     opt['train']['save_checkpoint_freq'] = 3
+    #     opt['datasets']['train']['batch_size'] = 2
+    #     opt['model']['beta_schedule']['train']['n_timestep'] = 10
+    #     opt['model']['beta_schedule']['val']['n_timestep'] = 10
+    #     opt['datasets']['train']['data_len'] = 6
+    #     opt['datasets']['val']['data_len'] = 3
 
     # validation in train phase
     if phase == 'train':
-        opt['datasets']['val']['data_len'] = 3
+        opt['datasets']['val']['data_len'] = 6
 
     # W&B Logging
     try:

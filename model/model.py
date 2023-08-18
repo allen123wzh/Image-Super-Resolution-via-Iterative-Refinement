@@ -68,8 +68,6 @@ class DDPM(BaseModel):
         self.data = self.set_device(data)
 
     def optimize_parameters(self, it=None, grad_accum=1):
-        
-        
         ##########################
         ##########################
         ##########################
@@ -83,6 +81,7 @@ class DDPM(BaseModel):
 
             scaler.scale(l_noise).backward()
             scaler.scale(l_recon).backward()
+            # scaler.scale(l_noise+l_recon).backward()
 
             if it % grad_accum == 0:
                 # scaler.step(self.optG)

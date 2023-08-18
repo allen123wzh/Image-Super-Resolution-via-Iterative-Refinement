@@ -293,18 +293,18 @@ class GaussianDiffusion(nn.Module):
 
     def p_losses(self, x_in, noise=None):
         x_start = x_in['HR']
-        [b, c, h, w] = x_start.shape
+        [b, c, h, w] = x_start.shape    # [B, 3, H, W]
         t = torch.randint(0, self.num_timesteps, (b,),
                           device=x_start.device).long()
 
-        noise = default(noise, lambda: torch.randn_like(x_start))
-        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        noise = default(noise, lambda: torch.randn_like(x_start))   # [B, 3, H, W]
+        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)  # [B, 3, H, W]
 
         if not self.conditional:
             predicted_noise = self.denoise_fn(x_noisy, t)
         else:
             predicted_noise = self.denoise_fn(
-                torch.cat([x_in['SR'], x_noisy], dim=1), t)
+                torch.cat([x_in['SR'], x_noisy], dim=1), t)         # [B, 3, H, W]
 
         ####################################################
         ####################################################
@@ -312,13 +312,13 @@ class GaussianDiffusion(nn.Module):
         l_noise = self.loss_func(noise, predicted_noise)
         
         if self.global_corrector is not None:
+            # Need to detach the "predicted_noise" here to only backward through GC
             if not self.conditional:
                 x_recon = self.predict_start_from_noise(
-                    x_noisy, t=t, noise=self.denoise_fn(x_noisy, t))
+                    x_noisy, t=t, noise=predicted_noise.detach())
             else:
                 x_recon = self.predict_start_from_noise(
-                    x_noisy, t=t, noise=self.denoise_fn(torch.cat([x_in['SR'], x_noisy], dim=1), t))
-            
+                    x_noisy, t=t, noise=predicted_noise.detach())          
             x_recon.clamp_(-1., 1.)
             x_recon = self.global_corrector(x_recon, t)
             x_recon.clamp_(-1., 1.)

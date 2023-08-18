@@ -18,7 +18,6 @@ def resize_and_convert(img, size, resample):
     if(img.size[0] != size):
         img = trans_fn.resize(img, size, resample)
         img = trans_fn.center_crop(img, size)
-
     return img    
 
 def creat_gamma_lut(gamma):
@@ -26,7 +25,7 @@ def creat_gamma_lut(gamma):
     lut = np.clip(lut, 0, 255).astype((np.uint8))
     return lut
 
-def image_degradation(image):
+def image_degradation(image, gamma_range):
     image = cv2.cvtColor(np.asarray(image),cv2.COLOR_RGB2BGR)  
     image_blue_degradation = image.copy()
     #blue channel degradation, factor range from 0.6 to 0.8
@@ -53,7 +52,8 @@ def image_degradation(image):
 
 
     #gamma degradation of the image
-    gamma=np.random.uniform(1,1.2)
+    gamma=np.random.uniform(gamma_range[0],gamma_range[1])
+    # gamma=np.random.uniform(1.5,1.7)
     lut = creat_gamma_lut(gamma)
     gamma_image = cv2.LUT(noisy_image,lut)
 
@@ -79,28 +79,32 @@ def image_convert_bytes(img):
     return buffer.getvalue()
 
 
-def resize_multiple(img, sizes=(16, 128), resample=Image.BICUBIC, lmdb_save=False):
+def resize_multiple(img, sizes=(16, 128), resample=Image.BICUBIC, lmdb_save=False, gamma_range=(1.5,1.7)):
     # Low res degraded image
     lr_img = resize_and_convert(img, sizes[0], resample)
-    lr_img = image_degradation(lr_img)
+    lr_img = image_degradation(lr_img, gamma_range)
     # Original high res image
     hr_img = resize_and_convert(img, sizes[1], resample)
     # Upsampled low-res degraded image for NN input
     sr_img = resize_and_convert(lr_img, sizes[1], resample)
+    # Histogram equalized low-light image
+    hiseq_img = trans_fn.equalize(sr_img)
 
     if lmdb_save:
         lr_img = image_convert_bytes(lr_img)
         hr_img = image_convert_bytes(hr_img)
         sr_img = image_convert_bytes(sr_img)
+        hiseq_img = image_convert_bytes(hiseq_img)
 
-    return [lr_img, hr_img, sr_img]
+    return [lr_img, hr_img, sr_img, hiseq_img]
 
-def resize_worker(img_file, sizes, resample, lmdb_save=False):
+def resize_worker(img_file, sizes, resample, lmdb_save=False,
+                  gamma_range=(1.5, 1.7)):
 
     img = Image.open(img_file)
     img = img.convert('RGB')
     out = resize_multiple(
-        img, sizes=sizes, resample=resample, lmdb_save=lmdb_save)
+        img, sizes=sizes, resample=resample, lmdb_save=lmdb_save, gamma_range=gamma_range)
 
     return img_file.name.split('.')[0], out
 
@@ -127,7 +131,7 @@ class WorkingContext():
 def prepare_process_worker(wctx, file_subset):
     for file in file_subset:
         i, imgs = wctx.resize_fn(file)
-        lr_img, hr_img, sr_img = imgs
+        lr_img, hr_img, sr_img, hiseq_img = imgs
         if not wctx.lmdb_save:
             lr_img.save(
                 '{}/lr_{}/{}.png'.format(wctx.out_path, wctx.sizes[0], i.zfill(5)))
@@ -135,6 +139,8 @@ def prepare_process_worker(wctx, file_subset):
                 '{}/hr_{}/{}.png'.format(wctx.out_path, wctx.sizes[1], i.zfill(5)))
             sr_img.save(
                 '{}/sr_{}_{}/{}.png'.format(wctx.out_path, wctx.sizes[0], wctx.sizes[1], i.zfill(5)))
+            hiseq_img.save(
+                '{}/hiseq_{}/{}.png'.format(wctx.out_path, sizes[1], i.zfill(5)))
         else:
             with wctx.env.begin(write=True) as txn:
                 txn.put('lr_{}_{}'.format(
@@ -143,6 +149,8 @@ def prepare_process_worker(wctx, file_subset):
                     wctx.sizes[1], i.zfill(5)).encode('utf-8'), hr_img)
                 txn.put('sr_{}_{}_{}'.format(
                     wctx.sizes[0], wctx.sizes[1], i.zfill(5)).encode('utf-8'), sr_img)
+                txn.put('hiseq_{}_{}'.format(
+                    wctx.sizes[1], i.zfill(5)).encode('utf-8'), hiseq_img)
         curr_total = wctx.inc_get()
         if wctx.lmdb_save:
             with wctx.env.begin(write=True) as txn:
@@ -154,9 +162,11 @@ def all_threads_inactive(worker_threads):
             return False
     return True
 
-def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBIC, lmdb_save=False):
+def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBIC, 
+                lmdb_save=False, gamma_range=(1.5, 1.7)):
     resize_fn = partial(resize_worker, sizes=sizes,
-                        resample=resample, lmdb_save=lmdb_save)
+                        resample=resample, lmdb_save=lmdb_save,
+                        gamma_range=gamma_range)
     files = [p for p in Path(
         '{}'.format(img_path)).glob(f'**/*')]
 
@@ -166,6 +176,7 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
         os.makedirs('{}/hr_{}'.format(out_path, sizes[1]), exist_ok=True)
         os.makedirs('{}/sr_{}_{}'.format(out_path,
                     sizes[0], sizes[1]), exist_ok=True)
+        os.makedirs('{}/hiseq_{}'.format(out_path, sizes[1]), exist_ok=True)
     else:
         env = lmdb.open(out_path, map_size=1024 ** 4, readahead=False)
 
@@ -194,7 +205,7 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
         total = 0
         for file in tqdm(files):
             i, imgs = resize_fn(file)
-            lr_img, hr_img, sr_img = imgs
+            lr_img, hr_img, sr_img, hiseq_img = imgs
             if not lmdb_save:
                 lr_img.save(
                     '{}/lr_{}/{}.png'.format(out_path, sizes[0], i.zfill(5)))
@@ -202,6 +213,8 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
                     '{}/hr_{}/{}.png'.format(out_path, sizes[1], i.zfill(5)))
                 sr_img.save(
                     '{}/sr_{}_{}/{}.png'.format(out_path, sizes[0], sizes[1], i.zfill(5)))
+                hiseq_img.save(
+                    '{}/hiseq_{}/{}.png'.format(out_path, sizes[1], i.zfill(5)))
             else:
                 with env.begin(write=True) as txn:
                     txn.put('lr_{}_{}'.format(
@@ -210,6 +223,8 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
                         sizes[1], i.zfill(5)).encode('utf-8'), hr_img)
                     txn.put('sr_{}_{}_{}'.format(
                         sizes[0], sizes[1], i.zfill(5)).encode('utf-8'), sr_img)
+                    txn.put('hiseq_{}_{}'.format(
+                        sizes[1], i.zfill(5)).encode('utf-8'), hiseq_img)
             total += 1
             if lmdb_save:
                 with env.begin(write=True) as txn:
@@ -218,22 +233,25 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', '-p', type=str,
-                        default='/home/allen/Documents/MIE288/dataset_raw/CelebAMask-HQ_1024_30k_img_only/CelebA-HQ-img/'.format(Path.home()))
+                        default='/home/allen/Documents/MIE288/sr3_server4/dataset/dark/celebahq_256_256_gamma_1_1.2/hr_256'.format(Path.home()))
     parser.add_argument('--out', '-o', type=str,
                         default='./dataset/dark/celebahq')
-
-    parser.add_argument('--size', type=str, default='512,512')
+    parser.add_argument('--size', type=str, default='256,256')
     parser.add_argument('--n_worker', type=int, default=20)
     parser.add_argument('--resample', type=str, default='bicubic')
     # default save in png format
     parser.add_argument('--lmdb', '-l', action='store_true')
+    # low-light gamma division (larger number, darker img)
+    parser.add_argument('--gamma', '-g', type=str, default='1.5,1.7')
 
     args = parser.parse_args()
 
     resample_map = {'bilinear': Image.BILINEAR, 'bicubic': Image.BICUBIC}
     resample = resample_map[args.resample]
     sizes = [int(s.strip()) for s in args.size.split(',')]
+    gamma_range = [float(s.strip()) for s in args.gamma.split(',')]
 
-    args.out = '{}_{}_{}'.format(args.out, sizes[0], sizes[1])
+    args.out = '{}_{}_{}_gamma_{}_{}'.format(args.out, sizes[0], sizes[1], 
+                                             gamma_range[0], gamma_range[1])
     prepare(args.path, args.out, args.n_worker,
-            sizes=sizes, resample=resample, lmdb_save=args.lmdb)
+            sizes=sizes, resample=resample, lmdb_save=args.lmdb, gamma_range=gamma_range)
