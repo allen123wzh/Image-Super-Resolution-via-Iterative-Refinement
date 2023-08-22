@@ -33,6 +33,10 @@ class LRHRDataset(Dataset):
             if self.need_LR:
                 self.lr_path = Util.get_paths_from_images(
                     '{}/lr_{}'.format(dataroot, l_resolution))
+            ###########################
+            self.hiseq_path = Util.get_paths_from_images(
+                '{}/hiseq_{}'.format(dataroot, r_resolution))      
+            ###########################      
             self.dataset_len = len(self.hr_path)
             if self.data_len <= 0:
                 self.data_len = self.dataset_len
@@ -91,20 +95,21 @@ class LRHRDataset(Dataset):
             #######################
             #######################
             #######################
-            img_hiseq = T.functional.equalize(img_SR)
+            img_hiseq = Image.open(self.hiseq_path[index]).convert("RGB")
+            # img_hiseq = T.functional.equalize(img_SR)
             if self.need_LR:
                 img_LR = Image.open(self.lr_path[index]).convert("RGB")
 
         if self.need_LR:
             [img_LR, img_SR, img_HR, img_hiseq] = Util.transform_augment(
                 [img_LR, img_SR, img_HR, img_hiseq], split=self.split, min_max=(-1, 1))
-            return {'LR': img_LR, 'HR': img_HR, 'SR': img_hiseq, 'Index': index}
-            # return {'LR': img_LR, 'HR': img_HR, 'SR': img_SR, 'hiseq': img_hiseq, 'Index': index}
+            # return {'LR': img_LR, 'HR': img_HR, 'SR': img_hiseq, 'Index': index}
+            return {'LR': img_LR, 'HR': img_HR, 'SR': img_SR, 'hiseq': img_hiseq, 'Index': index}
         else:
             [img_SR, img_HR, img_hiseq] = Util.transform_augment(
                 [img_SR, img_HR, img_hiseq], split=self.split, min_max=(-1, 1))
-            return {'HR': img_HR, 'SR': img_hiseq, 'Index': index}
-            # return {'HR': img_HR, 'SR': img_SR, 'hiseq': img_hiseq, 'Index': index}
+            # return {'HR': img_HR, 'SR': img_hiseq, 'Index': index}
+            return {'HR': img_HR, 'SR': img_SR, 'hiseq': img_hiseq, 'Index': index}
             #######################
             #######################
             #######################

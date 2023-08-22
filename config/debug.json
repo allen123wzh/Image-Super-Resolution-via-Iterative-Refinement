@@ -2,14 +2,14 @@
     //"name": "ll_gc_256_g1_1.2",
     "name": "debug",
     "phase": "train", // train or val
-    "gpu_ids": [1],
+    "gpu_ids": [0],
     "path": { //set the path
         "log": "logs",
         "tb_logger": "tb_logger",
         "results": "results",
         "checkpoint": "checkpoint",
         "resume_state": null
-        //"resume_state": "I2500_E1" //pretrain model or training state
+        //"resume_state": "I1000_E2" //pretrain model or training state
     },
     "datasets": {
         "train": {
@@ -21,7 +21,6 @@
             "r_resolution": 256, // high resolution
             "batch_size": 14,
             "num_workers": 8,
-
             "use_shuffle": true,
             "data_len": -1 // -1 represents all data used in train
         },
@@ -32,14 +31,14 @@
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 256,
             "r_resolution": 256,
-            "data_len": 50
+            "data_len": 1
         }
     },
     "model": {
         "which_model_G": "ddpm", // use the ddpm or sr3 network structure
         "finetune_norm": false,
         "unet": {
-            "in_channel": 6,
+            "in_channel": 9,
             "out_channel": 3,
             "inner_channel": 64,
             "norm_groups": 16,
@@ -79,9 +78,10 @@
         }
     },
     "train": {
+        "grad_accum": 2,        
         "n_iter": 1000000, //1000000
-        "val_freq": 2,   //2500
-        "save_checkpoint_freq": 2, //2500
+        "val_freq": 1000,   //2500
+        "save_checkpoint_freq": 1000, //2500
         "print_freq": 1,
         "optimizer": {
             "type": "adam",

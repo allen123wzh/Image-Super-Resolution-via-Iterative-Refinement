@@ -107,13 +107,27 @@ class DDPM(BaseModel):
 
     def test(self, continous=False):
         self.netG.eval()
+        # with torch.no_grad():
+        #     if isinstance(self.netG, nn.DataParallel):
+        #         self.SR = self.netG.module.super_resolution(
+        #             self.data['SR'], continous)
+        #     else:
+        #         self.SR = self.netG.super_resolution(
+        #             self.data['SR'], continous)
+        ####################
+        ####################
+        ####################
         with torch.no_grad():
             if isinstance(self.netG, nn.DataParallel):
                 self.SR = self.netG.module.super_resolution(
-                    self.data['SR'], continous)
+                    torch.cat([self.data['SR'], self.data['hiseq']], dim=1), continous)
+            
             else:
                 self.SR = self.netG.super_resolution(
-                    self.data['SR'], continous)
+                    torch.cat([self.data['SR'], self.data['hiseq']], dim=1), continous)
+        ####################
+        ####################
+        ####################
         self.netG.train()
 
     def sample(self, batch_size=1, continous=False):

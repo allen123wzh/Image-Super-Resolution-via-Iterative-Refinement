@@ -230,11 +230,14 @@ class GaussianDiffusion(nn.Module):
                     ret_img = torch.cat([ret_img, img], dim=0)
             return img
         else:
-            x = x_in
-            shape = x.shape
+            x = x_in    # torch.cat([self.data['SR'], self.data['hiseq']], dim=1)
+            
+            ret_img = x[:,:3,:,:]
+            
+            shape = ret_img.shape
             b = shape[0]
             img = torch.randn(shape, device=device)
-            ret_img = x
+            # ret_img = x
             for i in tqdm(reversed(range(0, self.num_timesteps)), desc='sampling loop time step', total=self.num_timesteps):
                 img = self.p_sample(img, torch.full(
                     (b,), i, device=device, dtype=torch.long), condition_x=x)
@@ -300,15 +303,17 @@ class GaussianDiffusion(nn.Module):
         noise = default(noise, lambda: torch.randn_like(x_start))   # [B, 3, H, W]
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)  # [B, 3, H, W]
 
+        ####################################################
+        ####################################################
+        ####################################################
         if not self.conditional:
             predicted_noise = self.denoise_fn(x_noisy, t)
         else:
             predicted_noise = self.denoise_fn(
-                torch.cat([x_in['SR'], x_noisy], dim=1), t)         # [B, 3, H, W]
+                torch.cat([x_in['SR'], x_in['hiseq'], x_noisy], dim=1), t)         # [B, 3, H, W]
+            # predicted_noise = self.denoise_fn(
+            #     torch.cat([x_in['SR'], x_noisy], dim=1), t)         # [B, 3, H, W]
 
-        ####################################################
-        ####################################################
-        ####################################################
         l_noise = self.loss_func(noise, predicted_noise)
         
         if self.global_corrector is not None:

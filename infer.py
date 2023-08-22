@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+import random
 import data as Data
 import model as Model
 import argparse
@@ -9,9 +11,21 @@ from core.wandb_logger import WandbLogger
 from tensorboardX import SummaryWriter
 import os
 
+def set_seed(seed: int = 42) -> None:
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    # When running on the CuDNN backend, two further options must be set
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+    # Set a fixed value for the hash seed
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    print(f"Random seed set as {seed}")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/sr_sr3_16_128.json',
+    parser.add_argument('-c', '--config', type=str, default='config/inf_ll_ddpm.json',
                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['val'], help='val(generation)', default='val')
     parser.add_argument('-gpu', '--gpu_ids', type=str, default=None)
@@ -26,8 +40,7 @@ if __name__ == "__main__":
     opt = Logger.dict_to_nonedict(opt)
 
     # logging
-    torch.backends.cudnn.enabled = True
-    torch.backends.cudnn.benchmark = True
+    set_seed(42)
 
     Logger.setup_logger(None, opt['path']['log'],
                         'train', level=logging.INFO, screen=True)
@@ -62,6 +75,9 @@ if __name__ == "__main__":
     current_epoch = 0
     idx = 0
 
+    avg_psnr = 0.0
+    avg_ssim = 0.0
+
     result_path = '{}'.format(opt['path']['results'])
     os.makedirs(result_path, exist_ok=True)
     for _,  val_data in enumerate(val_loader):
@@ -94,8 +110,24 @@ if __name__ == "__main__":
         Metrics.save_img(
             fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
 
+        eval_psnr = Metrics.calculate_psnr(Metrics.tensor2img(visuals['SR'][-1]), hr_img)
+        eval_ssim = Metrics.calculate_ssim(Metrics.tensor2img(visuals['SR'][-1]), hr_img)
+
+        avg_psnr += eval_psnr
+        avg_ssim += eval_ssim
+
+        if wandb_logger and opt['log_eval']:
+            wandb_logger.log_eval_data(fake_img, Metrics.tensor2img(visuals['SR'][-1]), hr_img, eval_psnr, eval_ssim)
+
         if wandb_logger and opt['log_infer']:
             wandb_logger.log_eval_data(fake_img, Metrics.tensor2img(visuals['SR'][-1]), hr_img)
+
+    avg_psnr = avg_psnr / idx
+    avg_ssim = avg_ssim / idx
+
+    # log
+    logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
+    logger.info('# Validation # SSIM: {:.4e}'.format(avg_ssim))
 
     if wandb_logger and opt['log_infer']:
         wandb_logger.log_eval_table(commit=True)

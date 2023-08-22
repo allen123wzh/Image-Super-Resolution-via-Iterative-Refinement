@@ -47,10 +47,6 @@ if __name__ == "__main__":
     # Convert to NoneDict, which return None for missing key.
     opt = Logger.dict_to_nonedict(opt)
 
-    # logging
-    # torch.backends.cudnn.enabled = True
-    # torch.backends.cudnn.benchmark = True
-
     set_seed(42)
 
     Logger.setup_logger(None, opt['path']['log'],
@@ -114,7 +110,9 @@ if __name__ == "__main__":
                     break
                 
                 diffusion.feed_data(train_data)
-                diffusion.optimize_parameters(current_step, grad_accum=2)
+                # diffusion.optimize_parameters(current_step, grad_accum=2)
+                diffusion.optimize_parameters(current_step, 
+                                              grad_accum=opt['train']['grad_accum'])
                 # log
                 if current_step % opt['train']['print_freq'] == 0:
                     logs = diffusion.get_current_log()
@@ -161,7 +159,7 @@ if __name__ == "__main__":
                         tb_logger.add_image(
                             'Iter_{}'.format(current_step),
                             np.transpose(np.concatenate(
-                                (fake_img, sr_img, hr_img), axis=1), [2, 0, 1]),
+                                (lr_img, fake_img, sr_img, hr_img), axis=1), [2, 0, 1]),
                             idx)
                         avg_psnr += Metrics.calculate_psnr(
                             sr_img, hr_img)

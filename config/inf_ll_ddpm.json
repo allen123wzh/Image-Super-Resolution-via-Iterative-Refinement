@@ -1,5 +1,5 @@
 {
-    "name": "ll_gc_hiseq_cat_256_g1.5_1.7",
+    "name": "inf_ll_ddpm_gc_hiseq_cat_256_g1.5_1.7",
     "phase": "train", // train or val
     "gpu_ids": [0,1,2,3],
     "path": { //set the path
@@ -14,23 +14,23 @@
         "train": {
             "name": "FFHQ",
             "mode": "HR", // whether need LR img
-            "dataroot": "dataset/dark/ffhq_256_256_gamma_1.5_1.7",
+            "dataroot": "dataset/dark/celebahq_256_256_gamma_1.5_1.7",
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 256, // low resolution need to super_resolution
             "r_resolution": 256, // high resolution
             "batch_size": 52,
             "num_workers": 8,
             "use_shuffle": true,
-            "data_len": -1 // -1 represents all data used in train
+            "data_len": 15 // -1 represents all data used in train
         },
         "val": {
             "name": "CelebaHQ",
             "mode": "LRHR",
-            "dataroot": "dataset/dark/celebahq_256_256_gamma_1.5_1.7",
+            "dataroot": "dataset/dark/ffhq_256_256_gamma_1.5_1.7",
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 256,
             "r_resolution": 256,
-            "data_len": 10
+            "data_len": 15
         }
     },
     "model": {
