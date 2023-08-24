@@ -4,7 +4,7 @@ import logging
 from collections import OrderedDict
 import json
 from datetime import datetime
-
+import sys
 
 def mkdirs(paths):
     if isinstance(paths, str):
@@ -126,17 +126,30 @@ def dict2str(opt, indent_l=1):
     return msg
 
 
-def setup_logger(logger_name, root, phase, level=logging.INFO, screen=False):
-    '''set up logger'''
-    l = logging.getLogger(logger_name)
-    formatter = logging.Formatter(
-        '%(asctime)s.%(msecs)03d - %(levelname)s: %(message)s', datefmt='%y-%m-%d %H:%M:%S')
-    log_file = os.path.join(root, '{}.log'.format(phase))
-    fh = logging.FileHandler(log_file, mode='w')
-    fh.setFormatter(formatter)
+def setup_logger(name, local_rank, phase, 
+                 level=logging.INFO, save_path=None, print=False):
+    '''maskrcnn style: https://github.com/facebookresearch/maskrcnn-benchmark/blob/main/maskrcnn_benchmark/utils/logger.py#L7'''
+    l = logging.getLogger(name)
     l.setLevel(level)
-    l.addHandler(fh)
-    if screen:
-        sh = logging.StreamHandler()
-        sh.setFormatter(formatter)
-        l.addHandler(sh)
+    
+    # No logging for non-master process
+    if local_rank>0:
+        return l
+    
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s: %(message)s', datefmt='%y-%m-%d %H:%M:%S')
+
+    # FileHandle, save logs to disk
+    if save_path:
+        fh = logging.FileHandler(os.path.join(save_path, f'{phase}.log'))
+        fh.setLevel(level)
+        fh.setFormatter(formatter)
+        l.addHandler(fh)
+    
+    # StreamHandler, print to console
+    if print:
+        ch = logging.StreamHandler(stream=sys.stdout)
+        ch.setLevel(level)
+        ch.setFormatter(formatter)
+        l.addHandler(ch)
+    
+    return l

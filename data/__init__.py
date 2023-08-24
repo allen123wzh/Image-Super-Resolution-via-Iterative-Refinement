@@ -2,17 +2,22 @@
 import logging
 from re import split
 import torch.utils.data
-
+from torch.utils.data.distributed import DistributedSampler
 
 def create_dataloader(dataset, dataset_opt, phase):
     '''create dataloader '''
     if phase == 'train':
+        train_sampler = None
+        if dataset_opt['distributed']:
+            train_sampler = DistributedSampler(dataset, dataset_opt['use_shuffle'])
+            dataset_opt['use_shuffle'] = False
         return torch.utils.data.DataLoader(
             dataset,
             batch_size=dataset_opt['batch_size'],
             shuffle=dataset_opt['use_shuffle'],
             num_workers=dataset_opt['num_workers'],
-            pin_memory=True)
+            pin_memory=True,
+            sampler=train_sampler)
     elif phase == 'val':
         return torch.utils.data.DataLoader(
             dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)

@@ -7,8 +7,8 @@ import os
 import model.networks as networks
 from .base_model import BaseModel
 from torch.cuda.amp import autocast as autocast
-
-from accelerate import Accelerator
+from torch.nn.parallel import DistributedDataParallel as DDP
+from contextlib import nullcontext
 
 logger = logging.getLogger('base')
 scaler = torch.cuda.amp.GradScaler()
@@ -63,6 +63,18 @@ class DDPM(BaseModel):
             self.log_dict = OrderedDict()
         self.load_network()
         self.print_network()
+        
+        ### multi-gpu
+        if len(opt['gpu_ids'])>1:
+            assert torch.cuda.is_available()
+
+            ### DP
+            # self.netG.denoise_fn = nn.DataParallel(self.netG.denoise_fn)
+            # self.netG.global_corrector = nn.DataParallel(self.netG.global_corrector)
+
+            ### DDP
+            self.netG.denoise_fn = DDP(self.netG.denoise_fn, device_ids=[opt['local_rank']])
+            self.netG.global_corrector = DDP(self.netG.global_corrector, device_ids=[opt['local_rank']])
 
     def feed_data(self, data):
         self.data = self.set_device(data)
@@ -71,7 +83,14 @@ class DDPM(BaseModel):
         ##########################
         ##########################
         ##########################
+        
+        # # for DDP grad accum efficiency
+        # my_context1 = self.netG.denoise_fn.no_sync if self.opt['local_rank'] != -1 and it % grad_accum != 0 else nullcontext
+        # my_context2 = self.netG.global_corrector.no_sync if self.opt['local_rank'] != -1 and it % grad_accum != 0 else nullcontext
+
         with autocast(dtype=torch.float16):
+            # with my_context1():
+            #     with my_context2():
             l_noise, l_recon = self.netG(self.data)
             # need to average in multi-gpu
             b, c, h, w = self.data['HR'].shape
@@ -204,6 +223,8 @@ class DDPM(BaseModel):
 
         # logger.info(
         #     'Saved model in [{:s}] ...'.format(gen_path))
+        if self.opt['local_rank'] !=0:
+            return
         
         gen_path = os.path.join(
             self.opt['path']['checkpoint'], 'I{}_E{}_gen.pth'.format(iter_step, epoch))
@@ -211,9 +232,12 @@ class DDPM(BaseModel):
             self.opt['path']['checkpoint'], 'I{}_E{}_opt.pth'.format(iter_step, epoch))
         # gen
         network = self.netG
-        # if isinstance(self.netG.denoise_fn, nn.DataParallel) or isinstance(self.netG.global_corrector, nn.DataParallel):
-        #     network.denoise_fn = network.denoise_fn.module
-        #     network.global_corrector = network.global_corrector.module
+        
+        if isinstance(network.denoise_fn, nn.DataParallel) or isinstance(network.denoise_fn, nn.parallel.DistributedDataParallel):
+            network.denoise_fn = network.denoise_fn.module
+        if isinstance(network.global_corrector, nn.DataParallel) or isinstance(network.global_corrector, nn.parallel.DistributedDataParallel):
+            network.global_corrector = network.global_corrector.module
+        
         state_dict = network.state_dict()
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()

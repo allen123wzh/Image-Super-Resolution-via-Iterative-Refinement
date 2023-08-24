@@ -1,4 +1,8 @@
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 import data as Data
 import model as Model
 import argparse
@@ -11,10 +15,6 @@ import os
 import numpy as np
 import random
 
-from accelerate import Accelerator
-accelerator=Accelerator(mixed_precision="fp16")
-
-use_accelerate = False
 
 def set_seed(seed: int = 42) -> None:
     np.random.seed(seed)
@@ -30,10 +30,10 @@ def set_seed(seed: int = 42) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_256_256.json',
+    # parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_256_256.json',
+                        # help='JSON file for configuration')
+    parser.add_argument('-c', '--config', type=str, default='config/debug.json',
                         help='JSON file for configuration')
-    # parser.add_argument('-c', '--config', type=str, default='config/debug.json',
-    #                     help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
     parser.add_argument('-debug', '-d', action='store_true')
@@ -41,32 +41,47 @@ if __name__ == "__main__":
     parser.add_argument('-log_wandb_ckpt', action='store_true')
     parser.add_argument('-log_eval', action='store_true')
 
+    set_seed(42)
+
     # parse configs
     args = parser.parse_args()
     opt = Logger.parse(args)
     # Convert to NoneDict, which return None for missing key.
     opt = Logger.dict_to_nonedict(opt)
+    opt['local_rank']=-1
 
-    set_seed(42)
+    ######
+    ######
+    ###### DDP initialization
+    if len(opt['gpu_ids'])>1:
+        opt['distributed']=True
+        opt['datasets']['distributed']=True
+        # local_rank = int(os.environ["LOCAL_RANK"])
+        # torch.cuda.set_device(local_rank)
+        dist.init_process_group("nccl")
+        rank = dist.get_rank()
+        device_id = rank % torch.cuda.device_count()
+        
+        opt['local_rank']=device_id
+        print(f'Initialized DDP on rank {rank}')
 
-    Logger.setup_logger(None, opt['path']['log'],
-                        'train', level=logging.INFO, screen=True)
-    Logger.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
-    logger = logging.getLogger('base')
+        set_seed(42 + rank)
+
+        level=logging.INFO if rank in [-1, 0] else logging.WARN
+
+    # Root logger 
+    logger = Logger.setup_logger(None, local_rank=opt['local_rank'], phase='train', 
+                                 level=logging.INFO, save_path=opt['path']['log'], print=True)
+    # Validation logger, saves val result to another file, no print
+    logger_val =  Logger.setup_logger('val', local_rank=opt['local_rank'], phase='val', 
+                                 level=logging.INFO, save_path=opt['path']['log'], print=False)
     logger.info(Logger.dict2str(opt))
     tb_logger = SummaryWriter(log_dir=opt['path']['tb_logger'])
 
-    # Initialize WandbLogger
-    if opt['enable_wandb']:
-        import wandb
-        wandb_logger = WandbLogger(opt)
-        wandb.define_metric('validation/val_step')
-        wandb.define_metric('epoch')
-        wandb.define_metric("validation/*", step_metric="val_step")
-        val_step = 0
-    else:
-        wandb_logger = None
-
+    ######
+    ######
+    ######
+    
     # dataset
     for phase, dataset_opt in opt['datasets'].items():
         if phase == 'train' and args.phase != 'val':
@@ -95,17 +110,16 @@ if __name__ == "__main__":
     diffusion.set_new_noise_schedule(
         opt['model']['beta_schedule'][opt['phase']], schedule_phase=opt['phase'])
     
-    ### HF Acclerate
-    if use_accelerate:
-        diffusion.netG, diffusion.optG, train_loader = accelerator.prepare(
-            diffusion.netG, diffusion.optG, train_loader
-        )
 
     if opt['phase'] == 'train':
         while current_step < n_iter:
             current_epoch += 1
-            for _, train_data in enumerate(train_loader):
-                current_step += 1
+            # train_loader.sampler.set_epoch(current_epoch)
+
+            for current_step, train_data in enumerate(train_loader):
+                
+                if current_step==0:
+                    current_step += 1
                 if current_step > n_iter:
                     break
                 
@@ -123,15 +137,12 @@ if __name__ == "__main__":
                         tb_logger.add_scalar(k, v, current_step)
                     logger.info(message)
 
-                    if wandb_logger:
-                        wandb_logger.log_metrics(logs)
-
                 # validation
                 if current_step % opt['train']['val_freq'] == 0:
                     avg_psnr = 0.0
                     idx = 0
                     result_path = '{}/{}'.format(opt['path']
-                                                 ['results'], current_epoch)
+                                                ['results'], current_epoch)
                     os.makedirs(result_path, exist_ok=True)
 
                     diffusion.set_new_noise_schedule(
@@ -145,7 +156,7 @@ if __name__ == "__main__":
                         hr_img = Metrics.tensor2img(visuals['HR'])  # uint8, GT hi-res
                         lr_img = Metrics.tensor2img(visuals['LR'])  # uint8, Orig low-rs
                         fake_img = Metrics.tensor2img(visuals['INF'])  # uint8, inference input
-                                                                       # upsampled/his-eq
+                                                                    # upsampled/his-eq
 
                         # generation
                         # Metrics.save_img(
@@ -164,39 +175,21 @@ if __name__ == "__main__":
                         avg_psnr += Metrics.calculate_psnr(
                             sr_img, hr_img)
 
-                        if wandb_logger:
-                            wandb_logger.log_image(
-                                f'validation_{idx}', 
-                                np.concatenate((fake_img, sr_img, hr_img), axis=1)
-                            )
+                        avg_psnr = avg_psnr / idx
+                        diffusion.set_new_noise_schedule(
+                            opt['model']['beta_schedule']['train'], schedule_phase='train')
+                        # log
+                        logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
+                        # logger_val = logging.getLogger('val')  # validation logger
+                        logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}'.format(
+                            current_epoch, current_step, avg_psnr))
+                        # tensorboard logger
+                        tb_logger.add_scalar('psnr', avg_psnr, current_step)
 
-                    avg_psnr = avg_psnr / idx
-                    diffusion.set_new_noise_schedule(
-                        opt['model']['beta_schedule']['train'], schedule_phase='train')
-                    # log
-                    logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
-                    logger_val = logging.getLogger('val')  # validation logger
-                    logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}'.format(
-                        current_epoch, current_step, avg_psnr))
-                    # tensorboard logger
-                    tb_logger.add_scalar('psnr', avg_psnr, current_step)
+                    if current_step % opt['train']['save_checkpoint_freq'] == 0:
+                        logger.info('Saving models and training states.')
+                        diffusion.save_network(current_epoch, current_step)
 
-                    if wandb_logger:
-                        wandb_logger.log_metrics({
-                            'validation/val_psnr': avg_psnr,
-                            'validation/val_step': val_step
-                        })
-                        val_step += 1
-
-                if current_step % opt['train']['save_checkpoint_freq'] == 0:
-                    logger.info('Saving models and training states.')
-                    diffusion.save_network(current_epoch, current_step)
-
-                    if wandb_logger and opt['log_wandb_ckpt']:
-                        wandb_logger.log_checkpoint(current_epoch, current_step)
-
-            if wandb_logger:
-                wandb_logger.log_metrics({'epoch': current_epoch-1})
 
         # save model
         logger.info('End of training.')
@@ -247,9 +240,6 @@ if __name__ == "__main__":
             avg_psnr += eval_psnr
             avg_ssim += eval_ssim
 
-            if wandb_logger and opt['log_eval']:
-                wandb_logger.log_eval_data(fake_img, Metrics.tensor2img(visuals['SR'][-1]), hr_img, eval_psnr, eval_ssim)
-
         avg_psnr = avg_psnr / idx
         avg_ssim = avg_ssim / idx
 
@@ -259,11 +249,3 @@ if __name__ == "__main__":
         logger_val = logging.getLogger('val')  # validation logger
         logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}, ssim: {:.4e}'.format(
             current_epoch, current_step, avg_psnr, avg_ssim))
-
-        if wandb_logger:
-            if opt['log_eval']:
-                wandb_logger.log_eval_table()
-            wandb_logger.log_metrics({
-                'PSNR': float(avg_psnr),
-                'SSIM': float(avg_ssim)
-            })
