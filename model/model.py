@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import os
 import model.networks as networks
-from .base_model import BaseModel
 from torch.cuda.amp import autocast as autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from contextlib import nullcontext
@@ -13,9 +12,19 @@ from contextlib import nullcontext
 logger = logging.getLogger('base')
 scaler = torch.cuda.amp.GradScaler()
 
-class DDPM(BaseModel):
+class DDPM():
     def __init__(self, opt):
-        super(DDPM, self).__init__(opt)
+        self.opt = opt
+
+        ### DDP
+        if len(self.opt['gpu_ids'])>1:
+            self.device = torch.device('cuda', self.opt['local_rank'])
+        ### Single GPU
+        else:
+            self.device = torch.device('cuda' if opt['gpu_ids'] is not None else 'cpu')
+        self.begin_step = 0
+        self.begin_epoch = 0
+
         # define network and load pretrained models
         self.netG = self.set_device(networks.define_G(opt))
         self.schedule_phase = None
@@ -38,31 +47,19 @@ class DDPM(BaseModel):
                         logger.info(
                             'Params [{:s}] initialized to 0 and will optimize.'.format(k))
             else:
-                ##########################
-                ##########################
-                ##########################
-                # optim_params = list(self.netG.parameters())
-
                 optim_params1 = list(self.netG.denoise_fn.parameters())
                 optim_params2 = list(self.netG.global_corrector.parameters())
-
-            # self.optG = torch.optim.Adam(
-            #     optim_params, lr=opt['train']["optimizer"]["lr"])
 
             self.optG1 = torch.optim.Adam(
                 optim_params1, lr=opt['train']["optimizer"]["lr"])
             
             self.optG2 = torch.optim.Adam(
                 optim_params2, lr=opt['train']["optimizer"]["lr"])
-
-                ##########################
-                ##########################
-                ##########################
-
-
+            
             self.log_dict = OrderedDict()
-        self.load_network()
-        self.print_network()
+
+        self.load_network(rank=self.opt['local_rank'])
+        # self.print_network()
         
         ### multi-gpu
         if len(opt['gpu_ids'])>1:
@@ -203,29 +200,6 @@ class DDPM(BaseModel):
         logger.info(s)
 
     def save_network(self, epoch, iter_step):
-        # gen_path = os.path.join(
-        #     self.opt['path']['checkpoint'], 'I{}_E{}_gen.pth'.format(iter_step, epoch))
-        # opt_path = os.path.join(
-        #     self.opt['path']['checkpoint'], 'I{}_E{}_opt.pth'.format(iter_step, epoch))
-        # # gen
-        # network = self.netG
-        # if isinstance(self.netG, nn.DataParallel):
-        #     network = network.module
-        # state_dict = network.state_dict()
-        # for key, param in state_dict.items():
-        #     state_dict[key] = param.cpu()
-        # torch.save(state_dict, gen_path)
-        # # opt
-        # opt_state = {'epoch': epoch, 'iter': iter_step,
-        #              'scheduler': None, 'optimizer': None}
-        # opt_state['optimizer'] = self.optG.state_dict()
-        # torch.save(opt_state, opt_path)
-
-        # logger.info(
-        #     'Saved model in [{:s}] ...'.format(gen_path))
-        if self.opt['local_rank'] !=0:
-            return
-        
         gen_path = os.path.join(
             self.opt['path']['checkpoint'], 'I{}_E{}_gen.pth'.format(iter_step, epoch))
         opt_path = os.path.join(
@@ -244,7 +218,7 @@ class DDPM(BaseModel):
         torch.save(state_dict, gen_path)
         # opt
         opt_state = {'epoch': epoch, 'iter': iter_step, 'scheduler': None,
-                     'optimizer1': None, 'optimizer2': None}
+                    'optimizer1': None, 'optimizer2': None}
         opt_state['optimizer1'] = self.optG1.state_dict()
         opt_state['optimizer2'] = self.optG2.state_dict()
 
@@ -253,27 +227,8 @@ class DDPM(BaseModel):
         logger.info(
             'Saved model in [{:s}] ...'.format(gen_path))
 
-    def load_network(self):
-        # load_path = self.opt['path']['resume_state']
-        # if load_path is not None:
-        #     logger.info(
-        #         'Loading pretrained model for G [{:s}] ...'.format(load_path))
-        #     gen_path = '{}_gen.pth'.format(load_path)
-        #     opt_path = '{}_opt.pth'.format(load_path)
-        #     # gen
-        #     network = self.netG
-        #     if isinstance(self.netG, nn.DataParallel):
-        #         network = network.module
-        #     network.load_state_dict(torch.load(
-        #         gen_path), strict=(not self.opt['model']['finetune_norm']))
-        #     # network.load_state_dict(torch.load(
-        #     #     gen_path), strict=False)
-        #     if self.opt['phase'] == 'train':
-        #         # optimizer
-        #         opt = torch.load(opt_path)
-        #         self.optG.load_state_dict(opt['optimizer'])
-        #         self.begin_step = opt['iter']
-        #         self.begin_epoch = opt['epoch']
+
+    def load_network(self, rank):
         load_path = self.opt['path']['resume_state']
         if load_path is not None:
             logger.info(
@@ -282,13 +237,10 @@ class DDPM(BaseModel):
             opt_path = '{}_opt.pth'.format(load_path)
             # gen
             network = self.netG
-            # if isinstance(self.netG.denoise_fn, nn.DataParallel) or isinstance(self.netG.global_corrector, nn.DataParallel):
-            #     network.denoise_fn = network.denoise_fn.module
-            #     network.global_corrector = network.global_corrector.module
-            network.load_state_dict(torch.load(
-                gen_path), strict=(not self.opt['model']['finetune_norm']))
-            # network.load_state_dict(torch.load(
-            #     gen_path), strict=False)
+            network.load_state_dict(
+                torch.load(gen_path, map_location=f'cuda:{rank}'), 
+                strict=(not self.opt['model']['finetune_norm']))
+
             if self.opt['phase'] == 'train':
                 # optimizer
                 opt = torch.load(opt_path)
@@ -298,3 +250,27 @@ class DDPM(BaseModel):
 
                 self.begin_step = opt['iter']
                 self.begin_epoch = opt['epoch']
+    
+
+    def set_device(self, x):
+        if isinstance(x, dict):
+            for key, item in x.items():
+                if item is not None:
+                    x[key] = item.to(self.device)
+        elif isinstance(x, list):
+            for item in x:
+                if item is not None:
+                    item = item.to(self.device)
+        else:
+            x = x.to(self.device)
+        return x
+
+
+    def get_network_description(self, network):
+        '''Get the string and total parameters of the network'''
+        if isinstance(network, nn.DataParallel):
+            network = network.module
+        s = str(network)
+        n = sum(map(lambda x: x.numel(), network.parameters()))
+        return s, n
+

@@ -30,10 +30,10 @@ def set_seed(seed: int = 42) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_256_256.json',
-                        # help='JSON file for configuration')
-    parser.add_argument('-c', '--config', type=str, default='config/debug.json',
+    parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_256_256.json',
                         help='JSON file for configuration')
+    # parser.add_argument('-c', '--config', type=str, default='config/debug.json',
+    #                     help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
     parser.add_argument('-debug', '-d', action='store_true')
@@ -41,33 +41,32 @@ if __name__ == "__main__":
     parser.add_argument('-log_wandb_ckpt', action='store_true')
     parser.add_argument('-log_eval', action='store_true')
 
-    set_seed(42)
+    # set_seed(42)
 
     # parse configs
     args = parser.parse_args()
     opt = Logger.parse(args)
     # Convert to NoneDict, which return None for missing key.
     opt = Logger.dict_to_nonedict(opt)
-    opt['local_rank']=-1
+    opt['local_rank']=0
 
     ######
     ######
     ###### DDP initialization
     if len(opt['gpu_ids'])>1:
         opt['distributed']=True
-        opt['datasets']['distributed']=True
-        # local_rank = int(os.environ["LOCAL_RANK"])
-        # torch.cuda.set_device(local_rank)
+        opt['datasets']['train']['distributed']=True
+        
+
         dist.init_process_group("nccl")
         rank = dist.get_rank()
         device_id = rank % torch.cuda.device_count()
         
         opt['local_rank']=device_id
+        opt['datasets']['train']['local_rank']=device_id
         print(f'Initialized DDP on rank {rank}')
 
         set_seed(42 + rank)
-
-        level=logging.INFO if rank in [-1, 0] else logging.WARN
 
     # Root logger 
     logger = Logger.setup_logger(None, local_rank=opt['local_rank'], phase='train', 
@@ -110,21 +109,18 @@ if __name__ == "__main__":
     diffusion.set_new_noise_schedule(
         opt['model']['beta_schedule'][opt['phase']], schedule_phase=opt['phase'])
     
-
     if opt['phase'] == 'train':
         while current_step < n_iter:
             current_epoch += 1
+            train_loader.sampler.set_epoch(int(current_epoch))
             # train_loader.sampler.set_epoch(current_epoch)
 
-            for current_step, train_data in enumerate(train_loader):
-                
-                if current_step==0:
-                    current_step += 1
+            for _, train_data in enumerate(train_loader):
+                current_step += 1
                 if current_step > n_iter:
                     break
                 
                 diffusion.feed_data(train_data)
-                # diffusion.optimize_parameters(current_step, grad_accum=2)
                 diffusion.optimize_parameters(current_step, 
                                               grad_accum=opt['train']['grad_accum'])
                 # log
@@ -139,6 +135,7 @@ if __name__ == "__main__":
 
                 # validation
                 if current_step % opt['train']['val_freq'] == 0:
+                # if current_epoch % opt['train']['val_epoch_freq'] == 0:
                     avg_psnr = 0.0
                     idx = 0
                     result_path = '{}/{}'.format(opt['path']
@@ -186,9 +183,12 @@ if __name__ == "__main__":
                         # tensorboard logger
                         tb_logger.add_scalar('psnr', avg_psnr, current_step)
 
-                    if current_step % opt['train']['save_checkpoint_freq'] == 0:
-                        logger.info('Saving models and training states.')
-                        diffusion.save_network(current_epoch, current_step)
+                        if current_step % opt['train']['save_checkpoint_freq'] == 0:
+                        # if current_epoch % opt['train']['save_checkpoint_epoch_freq'] == 0:
+                            # if rank==0:
+                            logger.info('Saving models and training states.')
+                            diffusion.save_network(current_epoch, current_step)
+
 
 
         # save model

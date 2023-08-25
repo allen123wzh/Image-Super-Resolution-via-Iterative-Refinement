@@ -3,13 +3,17 @@ import logging
 from re import split
 import torch.utils.data
 from torch.utils.data.distributed import DistributedSampler
+import torch.distributed as dist
 
 def create_dataloader(dataset, dataset_opt, phase):
     '''create dataloader '''
     if phase == 'train':
         train_sampler = None
         if dataset_opt['distributed']:
-            train_sampler = DistributedSampler(dataset, dataset_opt['use_shuffle'])
+            train_sampler = DistributedSampler(dataset=dataset,
+                                               num_replicas=dist.get_world_size(),
+                                               rank=dist.get_rank(), 
+                                               shuffle=dataset_opt['use_shuffle'])
             dataset_opt['use_shuffle'] = False
         return torch.utils.data.DataLoader(
             dataset,

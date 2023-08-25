@@ -1,5 +1,4 @@
 {
-    //"name": "ll_gc_256_g1_1.2",
     "name": "debug",
     "phase": "train", // train or val
     "gpu_ids": [0,1],
@@ -9,7 +8,7 @@
         "results": "results",
         "checkpoint": "checkpoint",
         "resume_state": null
-        //"resume_state": "experiments/debug_230823_175415/checkpoint/I10_E1" //pretrain model or training state
+        //"resume_state": "experiments/debug_230824_184106/checkpoint/I10_E1" //pretrain model or training state
     },
     "datasets": {
         "train": {
@@ -22,7 +21,7 @@
             "batch_size": 12,  // Single GPU batch size in DDP
             "num_workers": 8,
             "use_shuffle": true,
-            "data_len": -1 // -1 represents all data used in train
+            "data_len": 96 // -1 represents all data used in train
         },
         "val": {
             "name": "CelebaHQ",
@@ -66,7 +65,7 @@
             },
             "val": {
                 "schedule": "cosine",
-                "n_timestep": 1000,
+                "n_timestep": 100,
                 "linear_start": 1e-6,
                 "linear_end": 1e-2
             }
@@ -78,14 +77,16 @@
         }
     },
     "train": {
-        "grad_accum": 1,        
+        "grad_accum": 2,        
         "n_iter": 1000000, //1000000
-        "val_freq": 5,   //2500
-        "save_checkpoint_freq": 5, //2500
+        "val_freq": 6,   //2500
+        //"val_epoch_freq": 6,   //2500
+        "save_checkpoint_freq": 6, //2500
+        //"save_checkpoint_epoch_freq": 6, //2500
         "print_freq": 1,
         "optimizer": {
             "type": "adam",
-            "lr": 1e-4
+            "lr": 1e-5
         },
         "ema_scheduler": { // not used now
             "step_start_ema": 5000,
