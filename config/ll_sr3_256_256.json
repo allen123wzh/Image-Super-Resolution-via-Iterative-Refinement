@@ -7,8 +7,8 @@
         "tb_logger": "tb_logger",
         "results": "results",
         "checkpoint": "checkpoint",
-        //"resume_state": null
-        "resume_state": "experiments/ddp_ll_gc_hiseq_cat_256_g1.5_1.7_230825_094958/checkpoint/I7500_E6" //pretrain model or training state
+        "resume_state": null
+        //"resume_state": "experiments/ddp_ll_gc_hiseq_cat_256_g1.5_1.7_230825_094958/checkpoint/I7500_E6" //pretrain model or training state
     },
     "datasets": {
         "train": {
@@ -30,7 +30,7 @@
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 256,
             "r_resolution": 256,
-            "data_len": 1
+            "data_len": 10
         }
     },
     "model": {
@@ -79,10 +79,10 @@
     "train": {
         "grad_accum": 1,        
         "n_iter": 1000000, //1000000
-        "val_freq": 2500,   //2500
-        //"val_epoch_freq": 2,   //2500
-        "save_checkpoint_freq": 2500, //2500
-        //"save_checkpoint_epoch_freq": 2, //2500
+        //"val_freq": 2500,   //2500
+        "val_epoch_freq": 2,   //2500
+        //"save_checkpoint_freq": 2500, //2500
+        "save_checkpoint_epoch_freq": 2, //2500
         "print_freq": 125,
         "optimizer": {
             "type": "adam",

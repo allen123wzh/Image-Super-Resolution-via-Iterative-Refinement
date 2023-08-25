@@ -14,7 +14,7 @@ from tensorboardX import SummaryWriter
 import os
 import numpy as np
 import random
-
+import time
 
 def set_seed(seed: int = 42) -> None:
     np.random.seed(seed)
@@ -57,7 +57,6 @@ if __name__ == "__main__":
         opt['distributed']=True
         opt['datasets']['train']['distributed']=True
         
-
         dist.init_process_group("nccl")
         rank = dist.get_rank()
         device_id = rank % torch.cuda.device_count()
@@ -88,9 +87,10 @@ if __name__ == "__main__":
             train_loader = Data.create_dataloader(
                 train_set, dataset_opt, phase)
         elif phase == 'val':
-            val_set = Data.create_dataset(dataset_opt, phase)
-            val_loader = Data.create_dataloader(
-                val_set, dataset_opt, phase)
+            if opt['local_rank'] in {-1, 0}:
+                val_set = Data.create_dataset(dataset_opt, phase)
+                val_loader = Data.create_dataloader(
+                    val_set, dataset_opt, phase)
     logger.info('Initial Dataset Finished')
 
     # model
@@ -112,10 +112,14 @@ if __name__ == "__main__":
     if opt['phase'] == 'train':
         while current_step < n_iter:
             current_epoch += 1
-            train_loader.sampler.set_epoch(int(current_epoch))
-            # train_loader.sampler.set_epoch(current_epoch)
+            if opt['distributed']:
+                # train_loader.sampler.set_epoch(int(current_epoch))
+                train_loader.sampler.set_epoch(current_epoch)
+            
+            # print(f'RANK {opt["local_rank"]} alive')
 
             for _, train_data in enumerate(train_loader):
+                # print(f'On RANK {opt["local_rank"]}, training')
                 current_step += 1
                 if current_step > n_iter:
                     break
@@ -133,9 +137,10 @@ if __name__ == "__main__":
                         tb_logger.add_scalar(k, v, current_step)
                     logger.info(message)
 
-                # validation
-                if current_step % opt['train']['val_freq'] == 0:
-                # if current_epoch % opt['train']['val_epoch_freq'] == 0:
+
+            if opt['local_rank'] in {-1,0}:
+            # validation
+                if current_epoch % opt['train']['val_epoch_freq'] == 0:
                     avg_psnr = 0.0
                     idx = 0
                     result_path = '{}/{}'.format(opt['path']
@@ -172,22 +177,21 @@ if __name__ == "__main__":
                         avg_psnr += Metrics.calculate_psnr(
                             sr_img, hr_img)
 
-                        avg_psnr = avg_psnr / idx
-                        diffusion.set_new_noise_schedule(
-                            opt['model']['beta_schedule']['train'], schedule_phase='train')
-                        # log
-                        logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
-                        # logger_val = logging.getLogger('val')  # validation logger
-                        logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}'.format(
-                            current_epoch, current_step, avg_psnr))
-                        # tensorboard logger
-                        tb_logger.add_scalar('psnr', avg_psnr, current_step)
+                    avg_psnr = avg_psnr / idx
+                    diffusion.set_new_noise_schedule(
+                        opt['model']['beta_schedule']['train'], schedule_phase='train')
+                    # log
+                    logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
+                    # logger_val = logging.getLogger('val')  # validation logger
+                    logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}'.format(
+                        current_epoch, current_step, avg_psnr))
+                    # tensorboard logger
+                    tb_logger.add_scalar('psnr', avg_psnr, current_step)
 
-                        if current_step % opt['train']['save_checkpoint_freq'] == 0:
-                        # if current_epoch % opt['train']['save_checkpoint_epoch_freq'] == 0:
-                            # if rank==0:
-                            logger.info('Saving models and training states.')
-                            diffusion.save_network(current_epoch, current_step)
+                if current_epoch % opt['train']['save_checkpoint_epoch_freq'] == 0:
+                    logger.info('Saving models and training states.')
+                    diffusion.save_network(current_epoch, current_step)
+
 
 
 

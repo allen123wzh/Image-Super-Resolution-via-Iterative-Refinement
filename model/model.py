@@ -8,6 +8,7 @@ import model.networks as networks
 from torch.cuda.amp import autocast as autocast
 from torch.nn.parallel import DistributedDataParallel as DDP
 from contextlib import nullcontext
+import copy
 
 logger = logging.getLogger('base')
 scaler = torch.cuda.amp.GradScaler()
@@ -59,7 +60,7 @@ class DDPM():
             self.log_dict = OrderedDict()
 
         self.load_network(rank=self.opt['local_rank'])
-        # self.print_network()
+        self.print_network()
         
         ### multi-gpu
         if len(opt['gpu_ids'])>1:
@@ -204,19 +205,23 @@ class DDPM():
             self.opt['path']['checkpoint'], 'I{}_E{}_gen.pth'.format(iter_step, epoch))
         opt_path = os.path.join(
             self.opt['path']['checkpoint'], 'I{}_E{}_opt.pth'.format(iter_step, epoch))
-        # gen
-        network = self.netG
+        
+        #################
+        # Need deepcopy, otherwise in DDP mode, rank 0 process has "network", other process has "network.module",
+        # other process would wait indefinitely for rank 0 to become "network.module", DDP breaks.
+        network = copy.deepcopy(self.netG)
         
         if isinstance(network.denoise_fn, nn.DataParallel) or isinstance(network.denoise_fn, nn.parallel.DistributedDataParallel):
             network.denoise_fn = network.denoise_fn.module
         if isinstance(network.global_corrector, nn.DataParallel) or isinstance(network.global_corrector, nn.parallel.DistributedDataParallel):
             network.global_corrector = network.global_corrector.module
-        
+    
         state_dict = network.state_dict()
+
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()
         torch.save(state_dict, gen_path)
-        # opt
+        # Optimizer
         opt_state = {'epoch': epoch, 'iter': iter_step, 'scheduler': None,
                     'optimizer1': None, 'optimizer2': None}
         opt_state['optimizer1'] = self.optG1.state_dict()
