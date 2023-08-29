@@ -233,10 +233,10 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', '-p', type=str,
-                        default='/home/allen/Documents/MIE288/sr3_server4/dataset/dark/celebahq_256_256_gamma_1_1.2/hr_256'.format(Path.home()))
+                        default='/home/allen/Documents/MIE288/sr3_server4/dataset/dark/ffhq_512_512_gamma_1_1.2/hr_512'.format(Path.home()))
     parser.add_argument('--out', '-o', type=str,
-                        default='./dataset/dark/celebahq')
-    parser.add_argument('--size', type=str, default='256,256')
+                        default='./dataset/dark/ffhq')
+    parser.add_argument('--size', type=str, default='512,512')
     parser.add_argument('--n_worker', type=int, default=20)
     parser.add_argument('--resample', type=str, default='bicubic')
     # default save in png format

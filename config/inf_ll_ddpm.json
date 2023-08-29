@@ -1,14 +1,14 @@
 {
     "name": "inf_ll_ddpm_gc_hiseq_cat_256_g1.5_1.7",
     "phase": "train", // train or val
-    "gpu_ids": [0,1,2,3],
+    "gpu_ids": [0],
     "path": { //set the path
         "log": "logs",
         "tb_logger": "tb_logger",
         "results": "results",
         "checkpoint": "checkpoint",
         //"resume_state": null
-        "resume_state": "I122500_E92" //pretrain model or training state
+        "resume_state": "I102130_E70" //pretrain model or training state
     },
     "datasets": {
         "train": {
@@ -21,12 +21,13 @@
             "batch_size": 52,
             "num_workers": 8,
             "use_shuffle": true,
-            "data_len": 15 // -1 represents all data used in train
+            "data_len": 10 // -1 represents all data used in train
         },
         "val": {
             "name": "CelebaHQ",
             "mode": "LRHR",
-            "dataroot": "dataset/dark/ffhq_256_256_gamma_1.5_1.7",
+            "dataroot": "dataset/dark/celebahq_256_256_gamma_1.5_1.7",
+            //"dataroot": "dataset/dark/ffhq_256_256_gamma_1.5_1.7",
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 256,
             "r_resolution": 256,

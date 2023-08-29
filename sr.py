@@ -30,9 +30,9 @@ def set_seed(seed: int = 42) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_256_256.json',
+    parser.add_argument('-c', '--config', type=str, default='config/ll_sr3_512_512.json',
                         help='JSON file for configuration')
-    # parser.add_argument('-c', '--config', type=str, default='config/debug.json',
+    # parser.add_argument('-c', '--config', type=str, default='config/debug_256.json',
     #                     help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
@@ -41,8 +41,6 @@ if __name__ == "__main__":
     parser.add_argument('-log_wandb_ckpt', action='store_true')
     parser.add_argument('-log_eval', action='store_true')
 
-    # set_seed(42)
-
     # parse configs
     args = parser.parse_args()
     opt = Logger.parse(args)
@@ -50,8 +48,6 @@ if __name__ == "__main__":
     opt = Logger.dict_to_nonedict(opt)
     opt['local_rank']=0
 
-    ######
-    ######
     ###### DDP initialization
     if len(opt['gpu_ids'])>1:
         opt['distributed']=True
@@ -66,6 +62,8 @@ if __name__ == "__main__":
         print(f'Initialized DDP on rank {rank}')
 
         set_seed(42 + rank)
+    else:
+        set_seed(42)
 
     # Root logger 
     logger = Logger.setup_logger(None, local_rank=opt['local_rank'], phase='train', 
@@ -75,10 +73,6 @@ if __name__ == "__main__":
                                  level=logging.INFO, save_path=opt['path']['log'], print=False)
     logger.info(Logger.dict2str(opt))
     tb_logger = SummaryWriter(log_dir=opt['path']['tb_logger'])
-
-    ######
-    ######
-    ######
     
     # dataset
     for phase, dataset_opt in opt['datasets'].items():
@@ -113,9 +107,7 @@ if __name__ == "__main__":
         while current_step < n_iter:
             current_epoch += 1
             if opt['distributed']:
-                # train_loader.sampler.set_epoch(int(current_epoch))
-                train_loader.sampler.set_epoch(current_epoch)
-            
+                train_loader.sampler.set_epoch(current_epoch)            
             # print(f'RANK {opt["local_rank"]} alive')
 
             for _, train_data in enumerate(train_loader):
@@ -137,11 +129,11 @@ if __name__ == "__main__":
                         tb_logger.add_scalar(k, v, current_step)
                     logger.info(message)
 
-
             if opt['local_rank'] in {-1,0}:
             # validation
                 if current_epoch % opt['train']['val_epoch_freq'] == 0:
                     avg_psnr = 0.0
+                    avg_ssim = 0.0
                     idx = 0
                     result_path = '{}/{}'.format(opt['path']
                                                 ['results'], current_epoch)
@@ -149,6 +141,7 @@ if __name__ == "__main__":
 
                     diffusion.set_new_noise_schedule(
                         opt['model']['beta_schedule']['val'], schedule_phase='val')
+                    
                     for _,  val_data in enumerate(val_loader):
                         idx += 1
                         diffusion.feed_data(val_data)
@@ -174,26 +167,26 @@ if __name__ == "__main__":
                             np.transpose(np.concatenate(
                                 (lr_img, fake_img, sr_img, hr_img), axis=1), [2, 0, 1]),
                             idx)
-                        avg_psnr += Metrics.calculate_psnr(
-                            sr_img, hr_img)
+                        avg_psnr += Metrics.calculate_psnr(sr_img, hr_img)
+                        avg_ssim += Metrics.calculate_ssim(sr_img, hr_img)
 
                     avg_psnr = avg_psnr / idx
+                    avg_ssim = avg_ssim / idx
+
                     diffusion.set_new_noise_schedule(
                         opt['model']['beta_schedule']['train'], schedule_phase='train')
                     # log
                     logger.info('# Validation # PSNR: {:.4e}'.format(avg_psnr))
+                    logger.info('# Validation # SSIM: {:.4e}'.format(avg_ssim))
                     # logger_val = logging.getLogger('val')  # validation logger
-                    logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}'.format(
-                        current_epoch, current_step, avg_psnr))
+                    logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}, ssim: {:.4e}'.format(
+                        current_epoch, current_step, avg_psnr, avg_ssim))
                     # tensorboard logger
                     tb_logger.add_scalar('psnr', avg_psnr, current_step)
 
                 if current_epoch % opt['train']['save_checkpoint_epoch_freq'] == 0:
                     logger.info('Saving models and training states.')
                     diffusion.save_network(current_epoch, current_step)
-
-
-
 
         # save model
         logger.info('End of training.')

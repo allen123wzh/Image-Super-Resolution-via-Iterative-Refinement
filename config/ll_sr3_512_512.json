@@ -1,5 +1,5 @@
 {
-    "name": "ll_ffhq_512_g1_1.2",
+    "name": "ft_512_g1.5_1.7",
     "phase": "train", // train or val
     "gpu_ids": [0,1,2,3],
     "path": { //set the path
@@ -8,17 +8,17 @@
         "results": "results",
         "checkpoint": "checkpoint",
         //"resume_state": null
-        "resume_state": "I285000_E22" //pretrain model or training state
+        "resume_state": "I256784_E176" //pretrain model or training state
     },
     "datasets": {
         "train": {
             "name": "FFHQ",
             "mode": "HR", // whether need LR img
-            "dataroot": "dataset/dark/ffhq_512_512_gamma_1_1.2",
+            "dataroot": "dataset/dark/ffhq_512_512_gamma_1.5_1.7",
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 512, // low resolution need to super_resolution
             "r_resolution": 512, // high resolution
-            "batch_size": 12,
+            "batch_size": 5,
             "num_workers": 8,
             "use_shuffle": true,
             "data_len": -1 // -1 represents all data used in train
@@ -26,18 +26,18 @@
         "val": {
             "name": "CelebaHQ",
             "mode": "LRHR",
-            "dataroot": "dataset/dark/celebahq_512_512_gamma_1_1.2",
+            "dataroot": "dataset/dark/celebahq_512_512_gamma_1.5_1.7",
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 512,
             "r_resolution": 512,
-            "data_len": 50
+            "data_len": 10
         }
     },
     "model": {
-        "which_model_G": "sr3", // use the ddpm or sr3 network structure
+        "which_model_G": "ddpm", // use the ddpm or sr3 network structure
         "finetune_norm": false,
         "unet": {
-            "in_channel": 6,
+            "in_channel": 9,
             "out_channel": 3,
             "inner_channel": 64,
             "norm_groups": 16,
@@ -51,7 +51,7 @@
                 16
             ],
             "attn_res": [
-                // 16
+                32
             ],
             "res_blocks": 1,
             "dropout": 0
@@ -77,10 +77,13 @@
         }
     },
     "train": {
-        "n_iter": 1000000,
-        "val_freq": 2500,
-        "save_checkpoint_freq": 2500,
-        "print_freq": 250,
+        "grad_accum": 1,        
+        "n_iter": 1000000, //1000000
+        //"val_freq": 2500,   //2500
+        "val_epoch_freq": 2,   //2500
+        //"save_checkpoint_freq": 2500, //2500
+        "save_checkpoint_epoch_freq": 2, //2500
+        "print_freq": 500,
         "optimizer": {
             "type": "adam",
             "lr": 1e-5

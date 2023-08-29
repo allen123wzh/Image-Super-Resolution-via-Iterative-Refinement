@@ -39,13 +39,22 @@ if __name__ == "__main__":
     # Convert to NoneDict, which return None for missing key.
     opt = Logger.dict_to_nonedict(opt)
 
+    opt['local_rank']=0
+
     # logging
     set_seed(42)
+    
+    # Root logger 
+    logger = Logger.setup_logger(None, local_rank=opt['local_rank'], phase='train', 
+                                 level=logging.INFO, save_path=opt['path']['log'], print=True)
+    # Validation logger, saves val result to another file, no print
+    logger_val =  Logger.setup_logger('val', local_rank=opt['local_rank'], phase='val', 
+                                 level=logging.INFO, save_path=opt['path']['log'], print=False)
 
-    Logger.setup_logger(None, opt['path']['log'],
-                        'train', level=logging.INFO, screen=True)
-    Logger.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
-    logger = logging.getLogger('base')
+    # Logger.setup_logger(None, opt['path']['log'],
+    #                     'train', level=logging.INFO, screen=True)
+    # Logger.setup_logger('val', opt['path']['log'], 'val', level=logging.INFO)
+    # logger = logging.getLogger('base')
     logger.info(Logger.dict2str(opt))
     tb_logger = SummaryWriter(log_dir=opt['path']['tb_logger'])
 

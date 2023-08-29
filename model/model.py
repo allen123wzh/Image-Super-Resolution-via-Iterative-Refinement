@@ -74,6 +74,11 @@ class DDPM():
             self.netG.denoise_fn = DDP(self.netG.denoise_fn, device_ids=[opt['local_rank']])
             self.netG.global_corrector = DDP(self.netG.global_corrector, device_ids=[opt['local_rank']])
 
+            ### PyTorch 2.0, compile
+            self.netG.denoise_fn = torch.compile(self.netG.denoise_fn)
+            self.netG.global_corrector = torch.compile(self.netG.global_corrector)
+
+
     def feed_data(self, data):
         self.data = self.set_device(data)
 
@@ -82,32 +87,32 @@ class DDPM():
         ##########################
         ##########################
         
-        # # for DDP grad accum efficiency
-        # my_context1 = self.netG.denoise_fn.no_sync if self.opt['local_rank'] != -1 and it % grad_accum != 0 else nullcontext
-        # my_context2 = self.netG.global_corrector.no_sync if self.opt['local_rank'] != -1 and it % grad_accum != 0 else nullcontext
+        # for DDP grad accum efficiency
+        my_context1 = self.netG.denoise_fn.no_sync if self.opt['local_rank'] != -1 and it % grad_accum != 0 else nullcontext
+        my_context2 = self.netG.global_corrector.no_sync if self.opt['local_rank'] != -1 and it % grad_accum != 0 else nullcontext
 
         with autocast(dtype=torch.float16):
-            # with my_context1():
-            #     with my_context2():
-            l_noise, l_recon = self.netG(self.data)
-            # need to average in multi-gpu
-            b, c, h, w = self.data['HR'].shape
+            with my_context1():
+                with my_context2():
+                    l_noise, l_recon = self.netG(self.data)
+                    # need to average in multi-gpu
+                    b, c, h, w = self.data['HR'].shape
 
-            l_noise = l_noise.sum()/int(b*c*h*w)
-            l_recon = l_recon.sum()/int(b*c*h*w)
+                    l_noise = l_noise.sum()/int(b*c*h*w)
+                    l_recon = l_recon.sum()/int(b*c*h*w)
 
-            scaler.scale(l_noise).backward()
-            scaler.scale(l_recon).backward()
-            # scaler.scale(l_noise+l_recon).backward()
+                    scaler.scale(l_noise).backward()
+                    scaler.scale(l_recon).backward()
+                    # scaler.scale(l_noise+l_recon).backward()
 
-            if it % grad_accum == 0:
-                # scaler.step(self.optG)
-                scaler.step(self.optG1)
-                scaler.step(self.optG2)
-                scaler.update()
-                # self.optG.zero_grad()
-                self.optG1.zero_grad()
-                self.optG2.zero_grad()
+                    if it % grad_accum == 0:
+                        # scaler.step(self.optG)
+                        scaler.step(self.optG1)
+                        scaler.step(self.optG2)
+                        scaler.update()
+                        # self.optG.zero_grad()
+                        self.optG1.zero_grad()
+                        self.optG2.zero_grad()
             
             # set log
             self.log_dict['l_noise'] = l_noise.item()
@@ -207,20 +212,24 @@ class DDPM():
             self.opt['path']['checkpoint'], 'I{}_E{}_opt.pth'.format(iter_step, epoch))
         
         #################
-        # Need deepcopy, otherwise in DDP mode, rank 0 process has "network", other process has "network.module",
-        # other process would wait indefinitely for rank 0 to become "network.module", DDP breaks.
+        # Need deepcopy, otherwise in DDP mode, rank 0 process's network will be different from 
+        # other process, other process may wait indefinitely for rank 0's network to return to 
+        # original form, DDP breaks.
         network = copy.deepcopy(self.netG)
-        
-        if isinstance(network.denoise_fn, nn.DataParallel) or isinstance(network.denoise_fn, nn.parallel.DistributedDataParallel):
-            network.denoise_fn = network.denoise_fn.module
-        if isinstance(network.global_corrector, nn.DataParallel) or isinstance(network.global_corrector, nn.parallel.DistributedDataParallel):
-            network.global_corrector = network.global_corrector.module
-    
         state_dict = network.state_dict()
 
-        for key, param in state_dict.items():
-            state_dict[key] = param.cpu()
+        # need to add list(), otherwise ordered dict mutated
+        for (key, param) in list(state_dict.items()):
+            # delete the DP/DDP prefix
+            if 'module.' in key:
+                new_key = key.replace('module.', '')
+                state_dict[new_key] = param.cpu()
+                del state_dict[key]
+            else:
+                state_dict[key] = param.cpu()
+
         torch.save(state_dict, gen_path)
+
         # Optimizer
         opt_state = {'epoch': epoch, 'iter': iter_step, 'scheduler': None,
                     'optimizer1': None, 'optimizer2': None}
