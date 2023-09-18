@@ -59,7 +59,7 @@ class DDPM():
             
             self.log_dict = OrderedDict()
 
-        self.load_network(rank=self.opt['local_rank'])
+        self.load_network(rank=self.opt['local_rank'] if self.opt['local_rank']!=-1 else 0)
         self.print_network()
         
         ### multi-gpu
@@ -74,7 +74,8 @@ class DDPM():
             self.netG.denoise_fn = DDP(self.netG.denoise_fn, device_ids=[opt['local_rank']])
             self.netG.global_corrector = DDP(self.netG.global_corrector, device_ids=[opt['local_rank']])
 
-            ### PyTorch 2.0, compile
+        ### PyTorch 2.0, compile
+        if opt['model']['torch_compile']:
             self.netG.denoise_fn = torch.compile(self.netG.denoise_fn)
             self.netG.global_corrector = torch.compile(self.netG.global_corrector)
 
@@ -257,7 +258,7 @@ class DDPM():
 
             if self.opt['phase'] == 'train':
                 # optimizer
-                opt = torch.load(opt_path)
+                opt = torch.load(opt_path, map_location=f'cuda:{rank}')
 
                 self.optG1.load_state_dict(opt['optimizer1'])
                 self.optG2.load_state_dict(opt['optimizer2'])

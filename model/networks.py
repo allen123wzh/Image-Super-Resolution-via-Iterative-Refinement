@@ -97,28 +97,22 @@ def define_G(opt):
         attn_res=model_opt['unet']['attn_res'],
         res_blocks=model_opt['unet']['res_blocks'],
         dropout=model_opt['unet']['dropout'],
-        image_size=model_opt['diffusion']['image_size']
+        # image_size=model_opt['diffusion']['image_size']
     )
 
     gc = global_corrector.GlobalCorrector(normal01=True)
 
     netG = diffusion.GaussianDiffusion(
         denoise_fn=denoise_fn,
-        image_size=model_opt['diffusion']['image_size'],
+        # image_size=model_opt['diffusion']['image_size'],
         channels=model_opt['diffusion']['channels'],
         loss_type='l1',    # L1 or L2
         conditional=model_opt['diffusion']['conditional'],
         schedule_opt=model_opt['beta_schedule']['train'],
         global_corrector=gc
     )
+
     if opt['phase'] == 'train':
         # init_weights(netG, init_type='kaiming', scale=0.1)
         init_weights(netG, init_type='orthogonal')
-    # if opt['gpu_ids'] and opt['distributed']:
-
-    # if len(opt['gpu_ids'])>1:
-    #     assert torch.cuda.is_available()
-    #     # netG = nn.DataParallel(netG)
-    #     netG.denoise_fn = nn.DataParallel(netG.denoise_fn)
-    #     netG.global_corrector = nn.DataParallel(netG.global_corrector)
     return netG

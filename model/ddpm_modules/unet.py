@@ -152,11 +152,11 @@ class UNet(nn.Module):
         inner_channel=32,
         norm_groups=32,
         channel_mults=(1, 2, 4, 8, 8),
-        attn_res=(8),
+        attn_res=(16),
         res_blocks=3,
         dropout=0,
         with_time_emb=True,
-        image_size=128
+        # image_size=128
     ):
         super().__init__()
 
@@ -175,12 +175,16 @@ class UNet(nn.Module):
         num_mults = len(channel_mults)
         pre_channel = inner_channel
         feat_channels = [pre_channel]
-        now_res = image_size
+        # now_res = image_size
+        downsample_rate = 1
         downs = [nn.Conv2d(in_channel, inner_channel,
                            kernel_size=3, padding=1)]
         for ind in range(num_mults):
             is_last = (ind == num_mults - 1)
-            use_attn = (now_res in attn_res)
+            
+            # use_attn = (now_res in attn_res)
+            use_attn = (downsample_rate in attn_res)
+            
             channel_mult = inner_channel * channel_mults[ind]
             for _ in range(0, res_blocks):
                 downs.append(ResnetBlocWithAttn(
@@ -190,7 +194,8 @@ class UNet(nn.Module):
             if not is_last:
                 downs.append(Downsample(pre_channel))
                 feat_channels.append(pre_channel)
-                now_res = now_res//2
+                # now_res = now_res//2
+                downsample_rate *= 2
         self.downs = nn.ModuleList(downs)
 
         self.mid = nn.ModuleList([
@@ -203,7 +208,10 @@ class UNet(nn.Module):
         ups = []
         for ind in reversed(range(num_mults)):
             is_last = (ind < 1)
-            use_attn = (now_res in attn_res)
+
+            # use_attn = (now_res in attn_res)
+            use_attn = (downsample_rate in attn_res)
+            
             channel_mult = inner_channel * channel_mults[ind]
             for _ in range(0, res_blocks+1):
                 ups.append(ResnetBlocWithAttn(
@@ -211,7 +219,8 @@ class UNet(nn.Module):
                 pre_channel = channel_mult
             if not is_last:
                 ups.append(Upsample(pre_channel))
-                now_res = now_res*2
+                # now_res = now_res*2
+                downsample_rate /= 2
 
         self.ups = nn.ModuleList(ups)
 

@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import random
-import data as Data
+import dataset as Data
 import model as Model
 import argparse
 import logging
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--config', type=str, default='config/inf_ll_ddpm.json',
                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['val'], help='val(generation)', default='val')
-    parser.add_argument('-gpu', '--gpu_ids', type=str, default=None)
+    # parser.add_argument('-gpu', '--gpu_ids', type=str, default=None)
     parser.add_argument('-debug', '-d', action='store_true')
     parser.add_argument('-enable_wandb', action='store_true')
     parser.add_argument('-log_infer', action='store_true')
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     # Convert to NoneDict, which return None for missing key.
     opt = Logger.dict_to_nonedict(opt)
 
-    opt['local_rank']=0
+    opt['local_rank']=-1
 
     # logging
     set_seed(42)

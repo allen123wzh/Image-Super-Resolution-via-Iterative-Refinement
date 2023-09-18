@@ -65,7 +65,7 @@ class GaussianDiffusion(nn.Module):
     def __init__(
         self,
         denoise_fn,
-        image_size,
+        # image_size,
         channels=3,
         loss_type='l1',
         conditional=True,
@@ -73,7 +73,7 @@ class GaussianDiffusion(nn.Module):
     ):
         super().__init__()
         self.channels = channels
-        self.image_size = image_size
+        # self.image_size = image_size
         self.denoise_fn = denoise_fn
         self.loss_type = loss_type
         self.conditional = conditional
@@ -199,11 +199,11 @@ class GaussianDiffusion(nn.Module):
         else:
             return ret_img[-1]
 
-    @torch.no_grad()
-    def sample(self, batch_size=1, continous=False):
-        image_size = self.image_size
-        channels = self.channels
-        return self.p_sample_loop((batch_size, channels, image_size, image_size), continous)
+    # @torch.no_grad()
+    # def sample(self, batch_size=1, continous=False):
+    #     image_size = self.image_size
+    #     channels = self.channels
+    #     return self.p_sample_loop((batch_size, channels, image_size, image_size), continous)
 
     @torch.no_grad()
     def super_resolution(self, x_in, continous=False):

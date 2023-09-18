@@ -1,0 +1,83 @@
+name: 8_gpu_256_6e-5
+phase: train
+gpu_ids: [0,1,2,3,4,5,6,7]
+
+# Path for logs and checkpoints
+path:
+  log: "logs"
+  tb_logger: "tb_logger"
+  results: "results"
+  checkpoint: "checkpoint"
+  resume_state: null
+  # resume_state: "/home/allen/Documents/MIE288/sr3_server4/experiments/8_gpu_256_2e-5/checkpoint/I11064_E24"
+
+# Dataset settings
+datasets:
+  train:
+    name: FFHQ
+    mode: HR
+    dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
+    l_resolution: 256
+    r_resolution: 256
+    batch_size: 6
+    num_workers: 8
+    shuffle: True
+    data_len: -1
+  val:
+    name: CelebaHQ
+    mode: LRHR
+    dataroot: "data/dark/celebahq_256_256_gamma_1.5_1.7"
+    l_resolution: 256
+    r_resolution: 256
+    batch_size: 1
+    data_len: 8
+
+# Model architecture
+model:
+  which_model_G: ddpm
+  finetune_norm: False
+  torch_compile: True
+
+  unet:
+    in_channel: 9
+    out_channel: 3
+    inner_channel: 64
+    norm_groups: 16
+    channel_multiplier: [1,2,4,8,16]
+    attn_res: [16]
+    res_blocks: 1
+    dropout: 0
+  
+  beta_schedule:
+    train:
+      schedule: cosine
+      n_timestep: 1000
+      linear_start: !!float 1e-6
+      linear_end: !!float 1e-2
+    val:
+      schedule: cosine
+      n_timestep: 1000
+      linear_start: !!float 1e-6
+      linear_end: !!float 1e-2      
+      
+  diffusion:
+    channels: 3
+    conditional: True
+  
+
+# Training
+train:
+  grad_accum: 1
+  n_iter: 1000000
+  val_epoch_freq: 2
+  save_ckpt_epoch_freq: 2
+  print_freq: 50
+
+  optimizer:
+    type: "adam"
+    lr: !!float 6e-5
+  
+  ema_scheduler:
+    step_start_ema: 5000
+    update_ema_every: 1
+    ema_decay: 0.9999
