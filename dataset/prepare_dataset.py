@@ -1,6 +1,4 @@
 import argparse
-from io import BytesIO
-import multiprocessing
 from multiprocessing import Lock, Process, RawValue
 from functools import partial
 from multiprocessing.sharedctypes import RawValue
@@ -9,7 +7,6 @@ from tqdm import tqdm
 from torchvision.transforms import functional as trans_fn
 import os
 from pathlib import Path
-import lmdb
 import numpy as np
 import time
 import cv2
@@ -57,31 +54,30 @@ def image_degradation(image, gamma_range):
 
     # gamma degradation of the image
     gamma=np.random.uniform(gamma_range[0],gamma_range[1])
-    # gamma=np.random.uniform(1.5,1.7)
     lut = creat_gamma_lut(gamma)
     gamma_image = cv2.LUT(noisy_image,lut)
 
-    return Image.fromarray(cv2.cvtColor(gamma_image,cv2.COLOR_BGR2RGB))
+    # return Image.fromarray(cv2.cvtColor(gamma_image,cv2.COLOR_BGR2RGB))
+
 
     #jpeg degradation of the image, range is 50~100
-    jpeg_quality = np.random.randint(40,95)
+    jpeg_quality = np.random.randint(85,95)
     jpeg_compression_params = [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality]
+    degradation_image_name = './temp.jpeg'
     cv2.imwrite(degradation_image_name, gamma_image, params=jpeg_compression_params)
-    compressed_image = cv2.imread(degradation_image_name)    
-    cv2.imshow("blue degradation", image_blue_degradation)
-    cv2.imshow("contrast_degradation", contrast_brightness_adjust_image)
-    cv2.imshow("Gaussian_degradatoin", noisy_image)
-    cv2.imshow("gamma_degradation", gamma_image)
-    cv2.imshow("jpeg", compressed_image)
-    cv2.imshow("original", image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    compressed_image = cv2.imread(degradation_image_name)
+
+    return Image.fromarray(cv2.cvtColor(compressed_image,cv2.COLOR_BGR2RGB))
 
 
-# def image_convert_bytes(img):
-#     buffer = BytesIO()
-#     img.save(buffer, format='png')
-#     return buffer.getvalue()
+    # cv2.imshow("blue degradation", image_blue_degradation)
+    # cv2.imshow("contrast_degradation", contrast_brightness_adjust_image)
+    # cv2.imshow("Gaussian_degradatoin", noisy_image)
+    # cv2.imshow("gamma_degradation", gamma_image)
+    # cv2.imshow("jpeg", compressed_image)
+    # cv2.imshow("original", image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
 
 def resize_multiple(img, sizes=(16, 128), resample=Image.BICUBIC,
@@ -101,12 +97,6 @@ def resize_multiple(img, sizes=(16, 128), resample=Image.BICUBIC,
     # Histogram equalized low-light image
     hiseq_img = trans_fn.equalize(sr_img)
 
-    # if lmdb_save:
-    #     lr_img = image_convert_bytes(lr_img)
-    #     hr_img = image_convert_bytes(hr_img)
-    #     sr_img = image_convert_bytes(sr_img)
-    #     hiseq_img = image_convert_bytes(hiseq_img)
-
     return [lr_img, hr_img, sr_img, hiseq_img]
 
 
@@ -122,8 +112,11 @@ def resize_worker(img_file, sizes, resample,
         center_crop = center_crop,
         degradation = degradation,
         gamma_range=gamma_range)
+    
+    filename = img_file.name.split('.')[0]
+    # filename = filename[-9:-5]
 
-    return img_file.name.split('.')[0], out
+    return filename, out
 
 
 class WorkingContext():
@@ -151,7 +144,7 @@ def prepare_process_worker(wctx, file_subset):
     for file in file_subset:
         i, imgs = wctx.resize_fn(file)
         lr_img, hr_img, sr_img, hiseq_img = imgs
-        # if not wctx.lmdb_save:
+
         lr_img.save(
             '{}/lr/{}.png'.format(wctx.out_path, i.zfill(5)))
         hr_img.save(
@@ -160,20 +153,17 @@ def prepare_process_worker(wctx, file_subset):
             '{}/sr/{}.png'.format(wctx.out_path, i.zfill(5)))
         hiseq_img.save(
             '{}/hiseq/{}.png'.format(wctx.out_path, i.zfill(5)))
-        # else:
-        #     with wctx.env.begin(write=True) as txn:
-        #         txn.put('lr_{}_{}'.format(
-        #             wctx.sizes[0], i.zfill(5)).encode('utf-8'), lr_img)
-        #         txn.put('hr_{}_{}'.format(
-        #             wctx.sizes[1], i.zfill(5)).encode('utf-8'), hr_img)
-        #         txn.put('sr_{}_{}_{}'.format(
-        #             wctx.sizes[0], wctx.sizes[1], i.zfill(5)).encode('utf-8'), sr_img)
-        #         txn.put('hiseq_{}_{}'.format(
-        #             wctx.sizes[1], i.zfill(5)).encode('utf-8'), hiseq_img)
+        
+        # lr_img.save(
+        #     '{}/lr/{}.png'.format(wctx.out_path, str(wctx.value()).zfill(5)))
+        # hr_img.save(
+        #     '{}/hr/{}.png'.format(wctx.out_path, str(wctx.value()).zfill(5)))
+        # sr_img.save(
+        #     '{}/sr/{}.png'.format(wctx.out_path, str(wctx.value()).zfill(5)))
+        # hiseq_img.save(
+        #     '{}/hiseq/{}.png'.format(wctx.out_path, str(wctx.value()).zfill(5)))
+
         wctx.inc_get()
-        # if wctx.lmdb_save:
-        #     with wctx.env.begin(write=True) as txn:
-        #         txn.put('length'.encode('utf-8'), str(curr_total).encode('utf-8'))
 
 
 def all_threads_inactive(worker_threads):
@@ -195,20 +185,14 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
     files = [p for p in Path(
         '{}'.format(img_path)).glob(f'**/*')]
 
-    # if not lmdb_save:
     os.makedirs(out_path, exist_ok=True)
     os.makedirs(f'{out_path}/lr', exist_ok=True)
     os.makedirs(f'{out_path}/hr', exist_ok=True)
     os.makedirs(f'{out_path}/sr', exist_ok=True)
     os.makedirs(f'{out_path}/hiseq', exist_ok=True)
-    # else:
-    #     env = lmdb.open(out_path, map_size=1024 ** 4, readahead=False)
 
     if n_worker > 1:
-        # prepare data subsets
-        # multi_env = None
-        # if lmdb_save:
-        #     multi_env = env
+
 
         file_subsets = np.array_split(files, n_worker)
         worker_threads = []
@@ -230,7 +214,7 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
         for file in tqdm(files):
             i, imgs = resize_fn(file)
             lr_img, hr_img, sr_img, hiseq_img = imgs
-            # if not lmdb_save:
+            
             lr_img.save(
                 '{}/lr/{}.png'.format(out_path, i.zfill(5)))
             hr_img.save(
@@ -239,37 +223,33 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
                 '{}/sr/{}.png'.format(out_path, i.zfill(5)))
             hiseq_img.save(
                 '{}/hiseq/{}.png'.format(out_path, i.zfill(5)))
-            # else:
-            #     with env.begin(write=True) as txn:
-            #         txn.put('lr_{}_{}'.format(
-            #             sizes[0], i.zfill(5)).encode('utf-8'), lr_img)
-            #         txn.put('hr_{}_{}'.format(
-            #             sizes[1], i.zfill(5)).encode('utf-8'), hr_img)
-            #         txn.put('sr_{}_{}_{}'.format(
-            #             sizes[0], sizes[1], i.zfill(5)).encode('utf-8'), sr_img)
-            #         txn.put('hiseq_{}_{}'.format(
-            #             sizes[1], i.zfill(5)).encode('utf-8'), hiseq_img)
+            
+            # lr_img.save(
+            #     '{}/lr/{}.png'.format(out_path, str(total).zfill(5)))
+            # hr_img.save(
+            #     '{}/hr/{}.png'.format(out_path, str(total).zfill(5)))
+            # sr_img.save(
+            #     '{}/sr/{}.png'.format(out_path, str(total).zfill(5)))
+            # hiseq_img.save(
+            #     '{}/hiseq/{}.png'.format(out_path, str(total).zfill(5)))
+
             total += 1
-            # if lmdb_save:
-            #     with env.begin(write=True) as txn:
-            #         txn.put('length'.encode('utf-8'), str(total).encode('utf-8'))
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', '-p', type=str,
-                        default='/home/allen/Documents/MIE288/sr3_server4/data/dark/ffhq_512_512_gamma_1_1.2/hr_512'.format(Path.home()))
+                        default='/home/allen/Documents/MIE288/sr3_server4/data/dark/jenny/train_512/rgb_512'.format(Path.home()))
     parser.add_argument('--out', '-o', type=str,
-                        default='./dataset/ffhq')
-    parser.add_argument('--size', type=str, default='128,256')
-    parser.add_argument('--n_worker', type=int, default=2)
+                        default='./data/dark/jenny_train')
+    parser.add_argument('--size', type=str, default='256,256')  # shorter edge
+    parser.add_argument('--n_worker', type=int, default=1)
     parser.add_argument('--resample', type=str, default='bicubic')
-    # default save in png format
-    # parser.add_argument('--lmdb', '-l', action='store_true')
-    # low-light gamma division (larger number, darker img)
+    
     parser.add_argument('--center_crop', '-c', action='store_true')
     parser.add_argument('--degradation', '-d', action='store_true')
-    parser.add_argument('--gamma', '-g', type=str, default='1.5,1.7')
+    parser.add_argument('--gamma', '-g', type=str, default='1.3,1.5') # low-light gamma division (larger number, darker img)
 
     args = parser.parse_args()
 

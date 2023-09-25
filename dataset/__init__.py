@@ -10,12 +10,8 @@ def create_dataset(dataset_opt, phase):
     '''create dataset'''
     # mode = dataset_opt['mode']
     dataset = LRHRDataset(dataroot=dataset_opt['dataroot'],
-                            # datatype=dataset_opt['datatype'],
-                            # l_resolution=dataset_opt['l_resolution'],
-                            # r_resolution=dataset_opt['r_resolution'],
                             split=phase,
                             data_len=dataset_opt['data_len'],
-                            # need_LR=(mode == 'LRHR')
                             )
     logger = logging.getLogger('base')
     logger.info('Dataset [{:s} - {:s}] is created.'.format(dataset.__class__.__name__,
@@ -40,7 +36,7 @@ def create_dataloader(dataset, dataset_opt, phase):
                 num_workers=dataset_opt['num_workers'],
                 pin_memory=True,
                 sampler=train_sampler)
-    elif phase == 'val':
+    elif phase == 'val' or phase == 'test':
         return torch.utils.data.DataLoader(
                 dataset, 
                 batch_size=1, 

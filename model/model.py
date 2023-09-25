@@ -32,8 +32,10 @@ class DDPM():
 
         # set loss and load resume state
         self.set_loss()
+        # self.set_new_noise_schedule(
+        #     opt['model']['beta_schedule']['train'], schedule_phase='train')
         self.set_new_noise_schedule(
-            opt['model']['beta_schedule']['train'], schedule_phase='train')
+            opt['model']['beta_schedule'][opt['phase']], schedule_phase=[opt['phase']])
         if self.opt['phase'] == 'train':
             self.netG.train()
             # find the parameters to optimize
@@ -51,10 +53,10 @@ class DDPM():
                 optim_params1 = list(self.netG.denoise_fn.parameters())
                 optim_params2 = list(self.netG.global_corrector.parameters())
 
-            self.optG1 = torch.optim.Adam(
+            self.optG1 = torch.optim.AdamW(
                 optim_params1, lr=opt['train']["optimizer"]["lr"])
             
-            self.optG2 = torch.optim.Adam(
+            self.optG2 = torch.optim.AdamW(
                 optim_params2, lr=opt['train']["optimizer"]["lr"])
             
             self.log_dict = OrderedDict()
@@ -142,12 +144,14 @@ class DDPM():
         ####################
         with torch.no_grad():
             if isinstance(self.netG, nn.DataParallel):
-                self.SR = self.netG.module.super_resolution(
-                    torch.cat([self.data['SR'], self.data['hiseq']], dim=1), continous)
-            
+                # self.SR = self.netG.module.super_resolution(
+                #     torch.cat([self.data['SR'], self.data['hiseq']], dim=1), continous)
+                self.SR = self.netG.module.super_resolution(self.data['SR'], continous)            
             else:
-                self.SR = self.netG.super_resolution(
-                    torch.cat([self.data['SR'], self.data['hiseq']], dim=1), continous)
+                # self.SR = self.netG.super_resolution(
+                #     torch.cat([self.data['SR'], self.data['hiseq']], dim=1), continous)
+                self.SR = self.netG.super_resolution(self.data['SR'], continous)            
+
         ####################
         ####################
         ####################
@@ -187,7 +191,8 @@ class DDPM():
         else:
             out_dict['SR'] = self.SR.detach().float().cpu()
             out_dict['INF'] = self.data['SR'].detach().float().cpu()
-            out_dict['HR'] = self.data['HR'].detach().float().cpu()
+            if 'HR' in self.data:
+                out_dict['HR'] = self.data['HR'].detach().float().cpu()
             if need_LR and 'LR' in self.data:
                 out_dict['LR'] = self.data['LR'].detach().float().cpu()
             else:
@@ -226,6 +231,11 @@ class DDPM():
                 new_key = key.replace('module.', '')
                 state_dict[new_key] = param.cpu()
                 del state_dict[key]
+            # delete torch.Compile() prefix
+            elif '_orig_mod.' in key:
+                new_key = key.replace('_orig_mod.', '')
+                state_dict[new_key] = param.cpu()
+                del state_dict[key]
             else:
                 state_dict[key] = param.cpu()
 
@@ -252,8 +262,25 @@ class DDPM():
             opt_path = '{}_opt.pth'.format(load_path)
             # gen
             network = self.netG
+
+            state_dict = torch.load(gen_path, map_location=f'cuda:{rank}')
+
+            for (key, param) in list(state_dict.items()):
+                # delete the DP/DDP prefix
+                if 'module.' in key:
+                    new_key = key.replace('module.', '')
+                    state_dict[new_key] = param
+                    del state_dict[key]
+                # delete torch.Compile() prefix
+                elif '_orig_mod.' in key:
+                    new_key = key.replace('_orig_mod.', '')
+                    state_dict[new_key] = param
+                    del state_dict[key]
+                else:
+                    state_dict[key] = param
+
             network.load_state_dict(
-                torch.load(gen_path, map_location=f'cuda:{rank}'), 
+                state_dict, 
                 strict=(not self.opt['model']['finetune_norm']))
 
             if self.opt['phase'] == 'train':

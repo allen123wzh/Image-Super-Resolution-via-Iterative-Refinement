@@ -14,8 +14,6 @@ def default(val, d):
     return d() if isfunction(d) else d
 
 # model
-
-
 class TimeEmbedding(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -59,8 +57,6 @@ class Downsample(nn.Module):
 
 
 # building block modules
-
-
 class Block(nn.Module):
     def __init__(self, dim, dim_out, groups=32, dropout=0):
         super().__init__()
@@ -215,7 +211,8 @@ class UNet(nn.Module):
             channel_mult = inner_channel * channel_mults[ind]
             for _ in range(0, res_blocks+1):
                 ups.append(ResnetBlocWithAttn(
-                    pre_channel+feat_channels.pop(), channel_mult, time_emb_dim=time_dim, dropout=dropout, norm_groups=norm_groups, with_attn=use_attn))
+                    pre_channel+feat_channels.pop(), channel_mult, time_emb_dim=time_dim, 
+                    dropout=dropout, norm_groups=norm_groups, with_attn=use_attn))
                 pre_channel = channel_mult
             if not is_last:
                 ups.append(Upsample(pre_channel))

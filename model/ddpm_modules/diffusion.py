@@ -309,10 +309,10 @@ class GaussianDiffusion(nn.Module):
         if not self.conditional:
             predicted_noise = self.denoise_fn(x_noisy, t)
         else:
-            predicted_noise = self.denoise_fn(
-                torch.cat([x_in['SR'], x_in['hiseq'], x_noisy], dim=1), t)         # [B, 3, H, W]
             # predicted_noise = self.denoise_fn(
-            #     torch.cat([x_in['SR'], x_noisy], dim=1), t)         # [B, 3, H, W]
+            #     torch.cat([x_in['SR'], x_in['hiseq'], x_noisy], dim=1), t)         # [B, 3, H, W]
+            predicted_noise = self.denoise_fn(
+                torch.cat([x_in['SR'], x_noisy], dim=1), t)         # [B, 3, H, W]
 
         l_noise = self.loss_func(noise, predicted_noise)
         

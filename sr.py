@@ -14,7 +14,7 @@ import random
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument('-c', '--config', type=str, default='config/ll_ffhq_256.yaml',
+    # parser.add_argument('-c', '--config', type=str, default='config/ll_jenny_256.yaml',
     #                     help='JSON file for configuration')
     parser.add_argument('-c', '--config', type=str, default='config/debug_256.yaml',
                             help='JSON file for configuration')
@@ -125,22 +125,20 @@ if __name__ == "__main__":
                         visuals = diffusion.get_current_visuals()
                         sr_img = tensor2img(visuals['SR'])  # uint8, super-res img
                         hr_img = tensor2img(visuals['HR'])  # uint8, GT hi-res
-                        lr_img = tensor2img(visuals['LR'])  # uint8, Orig low-rs
+                        # lr_img = tensor2img(visuals['LR'])  # uint8, Orig low-rs
                         fake_img = tensor2img(visuals['INF'])  # uint8, inference input
                                                                     # upsampled/his-eq
 
                         # generation
-                        # Metrics.save_img(
-                        #     hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
+                        save_img(hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
                         save_img(sr_img, '{}/{}_{}_sr.png'.format(result_path, current_step, idx))
-                        # Metrics.save_img(
-                        #     lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
-                        # Metrics.save_img(
-                        #     fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
+                        # save_img(lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
+                        save_img(fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
+                        
                         tb_logger.add_image(
                             'Iter_{}'.format(current_step),
                             np.transpose(np.concatenate(
-                                (lr_img, fake_img, sr_img, hr_img), axis=1), [2, 0, 1]),
+                                (fake_img, sr_img, hr_img), axis=1), [2, 0, 1]),
                             idx)
                         avg_psnr += calculate_psnr(sr_img, hr_img)
                         avg_ssim += calculate_ssim(sr_img, hr_img)

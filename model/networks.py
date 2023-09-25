@@ -77,7 +77,6 @@ def init_weights(net, init_type='kaiming', scale=1, std=0.02):
 # define network
 ####################
 
-
 # Generator
 def define_G(opt):
     model_opt = opt['model']

@@ -1,6 +1,6 @@
-name: ll_norm_adamW_2e-5_ffhq
+name: jenny_rgb_norm_adamW
 phase: train
-gpu_ids: [0,1,2,3,4,5,6,7]
+gpu_ids: [7]
 
 # Path for logs and checkpoints
 path:
@@ -8,28 +8,28 @@ path:
   tb_logger: "tb_logger"
   results: "results"
   checkpoint: "checkpoint"
-  resume_state: null
-  # resume_state: "/home/allen/Documents/MIE288/sr3_server4/experiments/8_gpu_256_2e-5/checkpoint/I11064_E24"
+  # resume_state: null
+  resume_state: "/home/allen/Documents/MIE288/sr3_server4/I140064_E96"
 
 # Dataset settings
 datasets:
   train:
-    name: FFHQ
-    mode: HR
-    dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
+    name: Jenny
+    # mode: HR
+    dataroot: "data/dark/jenny_train_256_256_gamma_1.3_1.5"
     l_resolution: 256
     r_resolution: 256
-    batch_size: 6
+    batch_size: 8
     num_workers: 8
     shuffle: True
     data_len: -1
   val:
-    name: CelebaHQ
-    mode: LRHR
-    dataroot: "data/dark/celebahq_256_256_gamma_1.5_1.7"
+    name: Jenny
+    # mode: LRHR
+    dataroot: "data/dark/jenny_train_256_256_gamma_1.3_1.5"
     l_resolution: 256
     r_resolution: 256
-    batch_size: 1
+    batch_size: 4
     data_len: 8
 
 # Model architecture
@@ -69,13 +69,13 @@ model:
 train:
   grad_accum: 1
   n_iter: 1000000
-  val_epoch_freq: 2
-  save_ckpt_epoch_freq: 2
-  print_freq: 125
+  val_epoch_freq: 20
+  save_ckpt_epoch_freq: 20
+  print_freq: 10
 
   optimizer:
     type: "adam"
-    lr: !!float 2e-5
+    lr: !!float 3e-6
   
   ema_scheduler:
     step_start_ema: 5000
