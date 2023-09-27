@@ -1,6 +1,9 @@
-name: infer
+name: infer_ir_E1300_jenny_real
 phase: test
-gpu_ids: [2]
+gpu_ids: [6]
+
+# Adding IR to the input
+ir: True
 
 # Path for logs and checkpoints
 path:
@@ -8,17 +11,21 @@ path:
   tb_logger: "tb_logger"
   results: "results"
   checkpoint: "checkpoint"
-  # resume_state: /home/allen/Documents/MIE288/sr3_server4/experiments/jenny_rgb_norm_adamW_230925_122501/checkpoint/I142968_E120
-  resume_state: /home/allen/Documents/MIE288/sr3_server4/experiments/jenny_rgb_norm_adamW_230925_122501/checkpoint/I149018_E170
+  # resume_state: null
+  resume_state: /home/allen/Documents/MIE288/sr3_server4/experiments/jenny_ir_rgb_256_adamW_230926_154117/checkpoint/E1300
 
 # Dataset settings
 datasets:
   test:
-    name: infer
-    dataroot: "data/dark/jenny_256_256"
-    # dataroot: "data/dark/LOLv2-eval_256_256"
+    name: jenny_ir_real
+    dataroot: "data/dark/jenny_test_256_256"
     batch_size: 1
     data_len: -1
+    norm:
+      lr_mean: [0.0789, 0.0594, 0.0520]
+      lr_std: [0.0754, 0.0638, 0.0614]
+      ir_mean: [0.44, 0.44, 0.44]
+      ir_std: [0.1, 0.1, 0.1]
 
 # Model architecture
 model:
@@ -27,7 +34,7 @@ model:
   torch_compile: True
 
   unet:
-    in_channel: 6
+    in_channel: 9
     out_channel: 3
     inner_channel: 64
     norm_groups: 16

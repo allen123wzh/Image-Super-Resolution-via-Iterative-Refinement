@@ -1,6 +1,9 @@
-name: jenny_rgb_norm_adamW
+name: jenny_ir_rgb_256_adamW
 phase: train
-gpu_ids: [7]
+gpu_ids: [4,5,6,7]
+
+# Adding IR to the input
+ir: True
 
 # Path for logs and checkpoints
 path:
@@ -9,28 +12,42 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: "/home/allen/Documents/MIE288/sr3_server4/I140064_E96"
+  resume_state: "/home/allen/Documents/MIE288/sr3_server4/E96"
 
 # Dataset settings
 datasets:
   train:
-    name: Jenny
+    name: jenny_ir_synth
     # mode: HR
     dataroot: "data/dark/jenny_train_256_256_gamma_1.3_1.5"
-    l_resolution: 256
-    r_resolution: 256
-    batch_size: 8
+    batch_size: 12
     num_workers: 8
     shuffle: True
     data_len: -1
+    norm:
+      hr_mean: [0.5, 0.5, 0.5]
+      hr_std: [0.5, 0.5, 0.5]
+      lr_mean: [0.0789, 0.0594, 0.0520]
+      lr_std: [0.0754, 0.0638, 0.0614]
+      ir_mean: [0.44, 0.44, 0.44]
+      ir_std: [0.1, 0.1, 0.1]
+
   val:
-    name: Jenny
+    name: jenny_ir_synth
     # mode: LRHR
     dataroot: "data/dark/jenny_train_256_256_gamma_1.3_1.5"
-    l_resolution: 256
-    r_resolution: 256
-    batch_size: 4
+    # l_resolution: 256
+    # r_resolution: 256
+    batch_size: 1
     data_len: 8
+    norm:
+      hr_mean: [0.5, 0.5, 0.5]
+      hr_std: [0.5, 0.5, 0.5]
+      lr_mean: [0.0789, 0.0594, 0.0520]
+      lr_std: [0.0754, 0.0638, 0.0614]
+      ir_mean: [0.44, 0.44, 0.44]
+      ir_std: [0.1, 0.1, 0.1]
+
 
 # Model architecture
 model:
@@ -39,7 +56,7 @@ model:
   torch_compile: True
 
   unet:
-    in_channel: 6
+    in_channel: 9  # RGB + IR + Noise
     out_channel: 3
     inner_channel: 64
     norm_groups: 16
@@ -69,13 +86,13 @@ model:
 train:
   grad_accum: 1
   n_iter: 1000000
-  val_epoch_freq: 20
-  save_ckpt_epoch_freq: 20
+  val_epoch_freq: 100
+  save_ckpt_epoch_freq: 100
   print_freq: 10
 
   optimizer:
     type: "adam"
-    lr: !!float 3e-6
+    lr: !!float 2e-5
   
   ema_scheduler:
     step_start_ema: 5000

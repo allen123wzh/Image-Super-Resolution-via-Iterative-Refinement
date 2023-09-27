@@ -18,7 +18,7 @@ datasets:
     dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
     # l_resolution: 256
     # r_resolution: 256
-    batch_size: 1
+    batch_size: 3
     num_workers: 8
     shuffle: True
     data_len: 190

@@ -114,7 +114,7 @@ def resize_worker(img_file, sizes, resample,
         gamma_range=gamma_range)
     
     filename = img_file.name.split('.')[0]
-    # filename = filename[-9:-5]
+    filename = filename[-8:-5]
 
     return filename, out
 
@@ -240,9 +240,9 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', '-p', type=str,
-                        default='/home/allen/Documents/MIE288/sr3_server4/data/dark/jenny/train_512/rgb_512'.format(Path.home()))
+                        default='/home/allen/Documents/MIE288/sr3_server4/data/dark/jenny/test_512/rgb_512'.format(Path.home()))
     parser.add_argument('--out', '-o', type=str,
-                        default='./data/dark/jenny_train')
+                        default='./data/dark/jenny_test')
     parser.add_argument('--size', type=str, default='256,256')  # shorter edge
     parser.add_argument('--n_worker', type=int, default=1)
     parser.add_argument('--resample', type=str, default='bicubic')

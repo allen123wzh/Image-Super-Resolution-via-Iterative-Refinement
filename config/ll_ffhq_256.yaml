@@ -9,7 +9,6 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   resume_state: null
-  # resume_state: "/home/allen/Documents/MIE288/sr3_server4/experiments/8_gpu_256_2e-5/checkpoint/I11064_E24"
 
 # Dataset settings
 datasets:
@@ -23,6 +22,9 @@ datasets:
     num_workers: 8
     shuffle: True
     data_len: -1
+    norm:
+      lr_mean: [0.0789, 0.0594, 0.0520]
+      lr_std: [0.0754, 0.0638, 0.0614]
   val:
     name: CelebaHQ
     mode: LRHR
@@ -31,6 +33,9 @@ datasets:
     r_resolution: 256
     batch_size: 1
     data_len: 8
+    norm:
+      lr_mean: [0.0789, 0.0594, 0.0520]
+      lr_std: [0.0754, 0.0638, 0.0614]
 
 # Model architecture
 model:

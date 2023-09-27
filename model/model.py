@@ -40,13 +40,14 @@ class DDPM():
             self.netG.train()
             # find the parameters to optimize
             if opt['model']['finetune_norm']:
-                optim_params = []
-                for k, v in self.netG.named_parameters():
+                optim_params1 = []
+                optim_params2 = list(self.netG.global_corrector.parameters())
+                for k, v in self.netG.denoise_fn.named_parameters():
                     v.requires_grad = False
-                    if k.find('transformer') >= 0:
+                    if k.find('downs.0.') >= 0:
                         v.requires_grad = True
-                        v.data.zero_()
-                        optim_params.append(v)
+                        # v.data.zero_()
+                        optim_params1.append(v)
                         logger.info(
                             'Params [{:s}] initialized to 0 and will optimize.'.format(k))
             else:
@@ -144,13 +145,22 @@ class DDPM():
         ####################
         with torch.no_grad():
             if isinstance(self.netG, nn.DataParallel):
+                if 'IR' in self.data:
+                    self.SR = self.netG.module.super_resolution(
+                        torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)
+                
+                else:
                 # self.SR = self.netG.module.super_resolution(
                 #     torch.cat([self.data['SR'], self.data['hiseq']], dim=1), continous)
-                self.SR = self.netG.module.super_resolution(self.data['SR'], continous)            
+                    self.SR = self.netG.module.super_resolution(self.data['LR'], continous)            
             else:
+                if 'IR' in self.data:
+                    self.SR = self.netG.super_resolution(
+                        torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)
+                else:
                 # self.SR = self.netG.super_resolution(
                 #     torch.cat([self.data['SR'], self.data['hiseq']], dim=1), continous)
-                self.SR = self.netG.super_resolution(self.data['SR'], continous)            
+                    self.SR = self.netG.super_resolution(self.data['LR'], continous)            
 
         ####################
         ####################
@@ -184,20 +194,17 @@ class DDPM():
     def get_current_log(self):
         return self.log_dict
 
-    def get_current_visuals(self, need_LR=True, sample=False):
+    def get_current_visuals(self):
         out_dict = OrderedDict()
-        if sample:
-            out_dict['SAM'] = self.SR.detach().float().cpu()
-        else:
-            out_dict['SR'] = self.SR.detach().float().cpu()
-            out_dict['INF'] = self.data['SR'].detach().float().cpu()
-            if 'HR' in self.data:
-                out_dict['HR'] = self.data['HR'].detach().float().cpu()
-            if need_LR and 'LR' in self.data:
-                out_dict['LR'] = self.data['LR'].detach().float().cpu()
-            else:
-                out_dict['LR'] = out_dict['INF']
+        out_dict['SR'] = self.SR.detach().float().cpu()
+        out_dict['LR'] = self.data['LR'].detach().float().cpu()
+        if 'IR' in self.data:
+            out_dict['IR'] = self.data['IR'].detach().float().cpu()
+        if 'HR' in self.data:
+            out_dict['HR'] = self.data['HR'].detach().float().cpu()
+
         return out_dict
+
 
     def print_network(self):
         s, n = self.get_network_description(self.netG)
@@ -211,11 +218,12 @@ class DDPM():
             'Network G structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
         logger.info(s)
 
+
     def save_network(self, epoch, iter_step):
         gen_path = os.path.join(
-            self.opt['path']['checkpoint'], 'I{}_E{}_gen.pth'.format(iter_step, epoch))
+            self.opt['path']['checkpoint'], 'E{}_gen.pth'.format(epoch))
         opt_path = os.path.join(
-            self.opt['path']['checkpoint'], 'I{}_E{}_opt.pth'.format(iter_step, epoch))
+            self.opt['path']['checkpoint'], 'E{}_opt.pth'.format(epoch))
         
         #################
         # Need deepcopy, otherwise in DDP mode, rank 0 process's network will be different from 
@@ -278,20 +286,25 @@ class DDPM():
                     del state_dict[key]
                 else:
                     state_dict[key] = param
+                # check if stored weights match the network params' name & shape    
+                if key in network.state_dict():
+                    if network.state_dict()[key].shape != param.shape:
+                        del state_dict[key]
+                else:
+                    del state_dict[key]
 
-            network.load_state_dict(
-                state_dict, 
-                strict=(not self.opt['model']['finetune_norm']))
 
-            if self.opt['phase'] == 'train':
-                # optimizer
-                opt = torch.load(opt_path, map_location=f'cuda:{rank}')
+            network.load_state_dict(state_dict, strict=False)
 
-                self.optG1.load_state_dict(opt['optimizer1'])
-                self.optG2.load_state_dict(opt['optimizer2'])
+            # if self.opt['phase'] == 'train':
+            #     # optimizer
+            #     opt = torch.load(opt_path, map_location=f'cuda:{rank}')
 
-                self.begin_step = opt['iter']
-                self.begin_epoch = opt['epoch']
+            #     self.optG1.load_state_dict(opt['optimizer1'])
+            #     self.optG2.load_state_dict(opt['optimizer2'])
+
+            #     self.begin_step = opt['iter']
+            #     self.begin_epoch = opt['epoch']
     
 
     def set_device(self, x):

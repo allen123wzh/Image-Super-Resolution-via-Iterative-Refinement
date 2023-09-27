@@ -9,7 +9,7 @@ import os
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/infer.yaml',
+    parser.add_argument('-c', '--config', type=str, default='config/infer_ir.yaml',
                         help='YAML file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val', 'test'], default='test')
 
@@ -21,6 +21,9 @@ if __name__ == "__main__":
     
     set_seed(42)
 
+    if opt['ir']:
+        opt['datasets']['test']['ir'] = True
+
     # Root logger 
     logger = setup_logger(None, local_rank=opt['local_rank'], phase=opt['phase'], 
                                     level=logging.INFO, save_path=opt['path']['log'], print=True)
@@ -29,7 +32,6 @@ if __name__ == "__main__":
     
     # dataset
     for phase, dataset_opt in opt['datasets'].items():
-        
         dataset = Data.create_dataset(dataset_opt, phase)
         dataloader = Data.create_dataloader(dataset, dataset_opt, phase)
 
@@ -62,7 +64,7 @@ if __name__ == "__main__":
         visuals = diffusion.get_current_visuals()
 
         lr_img = tensor2img(visuals['LR'])  # uint8
-        fake_img = tensor2img(visuals['INF'])  # uint8
+        ir_img = tensor2img(visuals['IR'])  # uint8
 
         sr_img_mode = 'grid'
         if sr_img_mode == 'single':

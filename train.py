@@ -14,10 +14,10 @@ import random
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument('-c', '--config', type=str, default='config/ll_jenny_256.yaml',
-    #                     help='JSON file for configuration')
-    parser.add_argument('-c', '--config', type=str, default='config/debug_256.yaml',
-                            help='JSON file for configuration')
+    parser.add_argument('-c', '--config', type=str, default='config/jenny_ir_rgb_256.yaml',
+                        help='JSON file for configuration')
+    # parser.add_argument('-c', '--config', type=str, default='config/debug_ir_256.yaml',
+    #                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                             help='Run either train(training) or val(generation)', default='train')
 
@@ -43,6 +43,10 @@ if __name__ == "__main__":
         set_seed(42 + rank)
     else:
         set_seed(42)
+
+    if opt['ir']:
+        opt['datasets']['train']['ir'] = True
+        opt['datasets']['val']['ir'] = True
 
     # Root logger 
     logger = setup_logger(None, local_rank=opt['local_rank'], phase='train', 
@@ -125,20 +129,22 @@ if __name__ == "__main__":
                         visuals = diffusion.get_current_visuals()
                         sr_img = tensor2img(visuals['SR'])  # uint8, super-res img
                         hr_img = tensor2img(visuals['HR'])  # uint8, GT hi-res
-                        # lr_img = tensor2img(visuals['LR'])  # uint8, Orig low-rs
-                        fake_img = tensor2img(visuals['INF'])  # uint8, inference input
-                                                                    # upsampled/his-eq
+                        lr_img = tensor2img(visuals['LR'])  # uint8, Orig low-rs
+                        if 'IR' in visuals:
+                            ir_img = tensor2img(visuals['IR']) # uint8, IR
 
-                        # generation
+                    
                         save_img(hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
                         save_img(sr_img, '{}/{}_{}_sr.png'.format(result_path, current_step, idx))
-                        # save_img(lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
-                        save_img(fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
-                        
+                        save_img(lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
+                        if 'IR' in visuals:
+                            save_img(ir_img, '{}/{}_{}_ir.png'.format(result_path, current_step, idx))  # uint8, IR image
+
+
                         tb_logger.add_image(
                             'Iter_{}'.format(current_step),
                             np.transpose(np.concatenate(
-                                (fake_img, sr_img, hr_img), axis=1), [2, 0, 1]),
+                                (lr_img, ir_img, hr_img, sr_img), axis=1), [2, 0, 1]),
                             idx)
                         avg_psnr += calculate_psnr(sr_img, hr_img)
                         avg_ssim += calculate_ssim(sr_img, hr_img)
