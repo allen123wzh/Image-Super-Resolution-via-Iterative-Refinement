@@ -3,6 +3,7 @@ from pathlib import Path
 from tqdm import tqdm
 import torch
 from torchvision.transforms import functional as T
+import torchvision.models.mobilenetv3
 
 img_path = '/home/allen/Documents/MIE288/sr3_server4/data/dark/jenny/test_512/ir_512'
 out_path = '/home/allen/Documents/MIE288/sr3_server4/data/dark/jenny_test_256_256/ir'

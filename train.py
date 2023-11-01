@@ -14,9 +14,9 @@ import random
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/jenny_ir_rgb_256.yaml',
+    parser.add_argument('-c', '--config', type=str, default='config/ll_new_ffhq_256.yaml',
                         help='JSON file for configuration')
-    # parser.add_argument('-c', '--config', type=str, default='config/debug_ir_256.yaml',
+    # parser.add_argument('-c', '--config', type=str, default='config/debug_256.yaml',
     #                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                             help='Run either train(training) or val(generation)', default='train')
@@ -114,6 +114,8 @@ if __name__ == "__main__":
                 if current_epoch % opt['train']['val_epoch_freq'] == 0:
                     avg_psnr = 0.0
                     avg_ssim = 0.0
+                    avg_psnr_ema = 0.0
+                    avg_ssim_ema = 0.0
                     idx = 0
                     result_path = f'{opt["path"]["results"]}/{current_epoch}'
 
@@ -132,26 +134,41 @@ if __name__ == "__main__":
                         lr_img = tensor2img(visuals['LR'])  # uint8, Orig low-rs
                         if 'IR' in visuals:
                             ir_img = tensor2img(visuals['IR']) # uint8, IR
+                        if 'SR_EMA' in visuals:
+                            sr_ema_img = tensor2img(visuals['SR_EMA'])  # uint8, super-res img
 
-                    
+
                         save_img(hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
                         save_img(sr_img, '{}/{}_{}_sr.png'.format(result_path, current_step, idx))
                         save_img(lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
                         if 'IR' in visuals:
                             save_img(ir_img, '{}/{}_{}_ir.png'.format(result_path, current_step, idx))  # uint8, IR image
+                        if 'SR_EMA' in visuals:
+                            save_img(sr_ema_img, '{}/{}_{}_sr_ema.png'.format(result_path, current_step, idx))  # uint8, IR image
 
-
-                        tb_logger.add_image(
-                            'Iter_{}'.format(current_step),
-                            np.transpose(np.concatenate(
-                                (lr_img, ir_img, hr_img, sr_img), axis=1), [2, 0, 1]),
-                            idx)
+                        if 'IR' in visuals:
+                            tb_logger.add_image(
+                                'Iter_{}'.format(current_step),
+                                np.transpose(np.concatenate(
+                                    (lr_img, ir_img, hr_img, sr_img), axis=1), [2, 0, 1]),
+                                idx)
+                        else:
+                            tb_logger.add_image(
+                                'Iter_{}'.format(current_step),
+                                np.transpose(np.concatenate(
+                                    (lr_img, hr_img, sr_img), axis=1), [2, 0, 1]),
+                                idx)
                         avg_psnr += calculate_psnr(sr_img, hr_img)
                         avg_ssim += calculate_ssim(sr_img, hr_img)
+                        if 'SR_EMA' in visuals:
+                            avg_psnr_ema += calculate_psnr(sr_ema_img, hr_img)
+                            avg_ssim_ema += calculate_ssim(sr_ema_img, hr_img)                        
 
                     avg_psnr = avg_psnr / idx
                     avg_ssim = avg_ssim / idx
-
+                    avg_psnr_ema = avg_psnr_ema / idx
+                    avg_ssim_ema = avg_ssim_ema / idx
+                    
                     diffusion.set_new_noise_schedule(
                         opt['model']['beta_schedule']['train'], schedule_phase='train')
                     # log
@@ -161,8 +178,14 @@ if __name__ == "__main__":
                     logger.info('# Validation #')
                     logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}, ssim: {:.4e}'.format(
                         current_epoch, current_step, avg_psnr, avg_ssim))
+                    logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}, ssim: {:.4e} EMA'.format(
+                        current_epoch, current_step, avg_psnr_ema, avg_ssim_ema))
                     # tensorboard logger
                     tb_logger.add_scalar('psnr', avg_psnr, current_step)
+                    tb_logger.add_scalar('ssim', avg_ssim, current_step)
+                    tb_logger.add_scalar('psnr_ema', avg_psnr_ema, current_step)
+                    tb_logger.add_scalar('ssim_ema', avg_ssim_ema, current_step)
+
 
                 if current_epoch % opt['train']['save_ckpt_epoch_freq'] == 0:
                     logger.info('Saving models and training states.')

@@ -1,6 +1,6 @@
-name: debug
+name: ll_allGN_biggan_deep_2x_norm_adamW_1e-5_ffhq
 phase: train
-gpu_ids: [0]
+gpu_ids: [0,1,2,3,4,5,6,7]
 
 # Path for logs and checkpoints
 path:
@@ -8,34 +8,36 @@ path:
   tb_logger: "tb_logger"
   results: "results"
   checkpoint: "checkpoint"
-  resume_state: null
+  resume_state: "experiments/ll_allGN_biggan_deep_2x_norm_adamW_1e-5_ffhq_231031_172541/checkpoint/E46"
 
 # Dataset settings
 datasets:
   train:
     name: FFHQ
-    # mode: HR
+    mode: HR
     dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
-    # l_resolution: 256
-    # r_resolution: 256
     batch_size: 4
     num_workers: 8
     shuffle: True
-    data_len: 60
+    data_len: -1
+    norm:
+      lr_mean: [0.0789, 0.0594, 0.0520]
+      lr_std: [0.0754, 0.0638, 0.0614]
   val:
     name: CelebaHQ
-    # mode: LRHR
+    mode: LRHR
     dataroot: "data/dark/celebahq_256_256_gamma_1.5_1.7"
-    # l_resolution: 256
-    # r_resolution: 256
     batch_size: 1
-    data_len: 1
+    data_len: 8
+    norm:
+      lr_mean: [0.0789, 0.0594, 0.0520]
+      lr_std: [0.0754, 0.0638, 0.0614]
 
 # Model architecture
 model:
   which_model_G: ddpm
   finetune_norm: False
-  torch_compile: False
+  torch_compile: True
 
   unet:
     in_channel: 6
@@ -46,7 +48,7 @@ model:
     attn_res: [8,16,32] # downsample, 32 means 256/32=8 actual res
     res_blocks: 2
     dropout: 0
-  
+
   beta_schedule:
     train:
       schedule: cosine
@@ -55,7 +57,7 @@ model:
       linear_end: !!float 1e-2
     val:
       schedule: cosine
-      n_timestep: 100
+      n_timestep: 1000
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2      
       
@@ -68,13 +70,13 @@ model:
 train:
   grad_accum: 1
   n_iter: 1000000
-  val_epoch_freq: 1
-  save_ckpt_epoch_freq: 1
-  print_freq: 1
+  val_epoch_freq: 2
+  save_ckpt_epoch_freq: 2
+  print_freq: 200
 
   optimizer:
     type: "adam"
-    lr: !!float 2e-5
+    lr: !!float 1e-5
   
   ema_scheduler:
     ema_start: 1

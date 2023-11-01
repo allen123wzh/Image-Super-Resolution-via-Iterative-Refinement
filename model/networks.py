@@ -82,8 +82,6 @@ def define_G(opt):
     model_opt = opt['model']
     if model_opt['which_model_G'] == 'ddpm':
         from .ddpm_modules import diffusion, unet, global_corrector
-    elif model_opt['which_model_G'] == 'sr3':
-        from .sr3_modules import diffusion, unet, global_corrector
     if ('norm_groups' not in model_opt['unet']) or model_opt['unet']['norm_groups'] is None:
         model_opt['unet']['norm_groups']=32
     
