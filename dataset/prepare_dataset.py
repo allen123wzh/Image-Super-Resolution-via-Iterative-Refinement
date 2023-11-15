@@ -13,10 +13,12 @@ import cv2
 
 
 def resize_and_convert(img, size, resample, center_crop=False):
-    if(img.size[0] != size):
+    if(img.size[0] != size): # size=384, single int
         img = trans_fn.resize(img, size, resample)
         if center_crop:
-            img = trans_fn.center_crop(img, size)
+            # img = trans_fn.center_crop(img, size)
+            img = trans_fn.center_crop(img, (384,512))
+
     return img    
 
 
@@ -114,7 +116,7 @@ def resize_worker(img_file, sizes, resample,
         gamma_range=gamma_range)
     
     filename = img_file.name.split('.')[0]
-    filename = filename[-8:-5]
+    # filename = filename[-8:-5]
 
     return filename, out
 
@@ -240,11 +242,11 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', '-p', type=str,
-                        default='/home/allen/Documents/MIE288/sr3_server4/data/dark/jenny/test_512/rgb_512'.format(Path.home()))
+                        default='/home/allen/Documents/MIE288/sr3_server4/data/fuse/m3fd_fusion/lr'.format(Path.home()))
     parser.add_argument('--out', '-o', type=str,
-                        default='./data/dark/jenny_test')
-    parser.add_argument('--size', type=str, default='256,256')  # shorter edge
-    parser.add_argument('--n_worker', type=int, default=1)
+                        default='./data/fuse/m3fd_fusion')
+    parser.add_argument('--size', type=str, default='768,768')  # shorter edge
+    parser.add_argument('--n_worker', type=int, default=40)
     parser.add_argument('--resample', type=str, default='bicubic')
     
     parser.add_argument('--center_crop', '-c', action='store_true')

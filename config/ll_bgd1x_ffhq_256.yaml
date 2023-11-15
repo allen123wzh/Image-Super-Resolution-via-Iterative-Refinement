@@ -1,6 +1,6 @@
-name: ll_2GN_bgd_128_1x_norm_adamW_1e-5_ffhq
+name: ll_2GN_bgd_64_1x_norm_adamW_1e-5_ffhq
 phase: train
-gpu_ids: [0,1,2,3]
+gpu_ids: [4,5,6,7]
 
 # Path for logs and checkpoints
 path:
@@ -9,7 +9,7 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: experiments/ll_2GN_bgd_128_1x_norm_adamW_1e-5_ffhq_231111_005301/checkpoint/E190
+  resume_state: experiments/ll_2GN_bgd_64_1x_norm_adamW_1e-5_ffhq_231111_112433/checkpoint/E280
 
 # Dataset settings
 datasets:
@@ -43,8 +43,8 @@ model:
   unet:
     in_channel: 6
     out_channel: 3
-    inner_channel: 128
-    norm_groups: 32
+    inner_channel: 64
+    norm_groups: 16
     channel_multiplier: [1,1,2,2,4,4]
     attn_res: [8,16,32] # downsample, 32 means 256/32=8 actual res
     res_blocks: 1

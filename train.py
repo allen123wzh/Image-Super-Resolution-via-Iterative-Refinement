@@ -14,9 +14,11 @@ import random
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/ll_new_ffhq_256.yaml',
+    parser.add_argument('-c', '--config', type=str, default='config/m3fd_ir_rgb_6M.yaml',
                         help='JSON file for configuration')
-    # parser.add_argument('-c', '--config', type=str, default='config/debug_256.yaml',
+    # parser.add_argument('-c', '--config', type=str, default='config/ll_bgd1x_ffhq_256.yaml',
+    #                     help='JSON file for configuration')
+    # parser.add_argument('-c', '--config', type=str, default='config/debug_ir_256.yaml',
     #                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                             help='Run either train(training) or val(generation)', default='train')
@@ -149,8 +151,11 @@ if __name__ == "__main__":
                         if 'IR' in visuals:
                             tb_logger.add_image(
                                 'Iter_{}'.format(current_step),
+                                # np.transpose(np.concatenate(
+                                #     (lr_img, ir_img, hr_img, sr_img), axis=1), [2, 0, 1]),
+                                # idx)
                                 np.transpose(np.concatenate(
-                                    (lr_img, ir_img, hr_img, sr_img), axis=1), [2, 0, 1]),
+                                    (lr_img, hr_img, sr_img), axis=1), [2, 0, 1]),
                                 idx)
                         else:
                             tb_logger.add_image(

@@ -1,6 +1,10 @@
-name: ll_2GN_bgd_128_1x_norm_adamW_1e-5_ffhq
+name: 9c_m3fd_25M_bgd1x128_h512w384
 phase: train
 gpu_ids: [0,1,2,3]
+# gpu_ids: [0]
+
+# Adding IR to the input
+ir: True
 
 # Path for logs and checkpoints
 path:
@@ -9,30 +13,39 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: experiments/ll_2GN_bgd_128_1x_norm_adamW_1e-5_ffhq_231111_005301/checkpoint/E190
+  resume_state: experiments/ll_2GN_bgd_128_1x_norm_adamW_1e-5_ffhq_231111_233952/checkpoint/E270
 
 # Dataset settings
 datasets:
   train:
-    name: FFHQ
-    mode: HR
-    dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
+    name: m3fd_detection
+    # dataroot: "data/fuse/m3fd_detect_512_384"
+    dataroot: "data/fuse/m3fd_detect_256_192"
     batch_size: 8
     num_workers: 8
     shuffle: True
     data_len: -1
     norm:
-      lr_mean: [0.0789, 0.0594, 0.0520]
-      lr_std: [0.0754, 0.0638, 0.0614]
+      hr_mean: [0.5, 0.5, 0.5]
+      hr_std: [0.5, 0.5, 0.5]
+      lr_mean: [0.503, 0.507, 0.492]
+      lr_std: [0.189, 0.193, 0.207]
+      ir_mean: [0.33]
+      ir_std: [0.198]
+
   val:
-    name: CelebaHQ
-    mode: LRHR
-    dataroot: "data/dark/celebahq_256_256_gamma_1.5_1.7"
+    name: m3fd_fusion
+    dataroot: "data/fuse/m3fd_fusion_512_384"
     batch_size: 1
     data_len: 15
     norm:
-      lr_mean: [0.0789, 0.0594, 0.0520]
-      lr_std: [0.0754, 0.0638, 0.0614]
+      hr_mean: [0.5, 0.5, 0.5]
+      hr_std: [0.5, 0.5, 0.5]
+      lr_mean: [0.503, 0.507, 0.492]
+      lr_std: [0.189, 0.193, 0.207]
+      ir_mean: [0.33]
+      ir_std: [0.198]
+
 
 # Model architecture
 model:
@@ -41,15 +54,16 @@ model:
   torch_compile: True
 
   unet:
-    in_channel: 6
+    in_channel: 9  # RGB + IR + Noise
+    # in_channel: 7  # RGB + IR + Noise
     out_channel: 3
     inner_channel: 128
     norm_groups: 32
     channel_multiplier: [1,1,2,2,4,4]
-    attn_res: [8,16,32] # downsample, 32 means 256/32=8 actual res
+    attn_res: [8,16,32]
     res_blocks: 1
     dropout: 0
-
+  
   beta_schedule:
     train:
       schedule: cosine
@@ -71,15 +85,15 @@ model:
 train:
   grad_accum: 1
   n_iter: 1000000
-  val_epoch_freq: 10
-  save_ckpt_epoch_freq: 10
-  print_freq: 200
+  val_epoch_freq: 100
+  save_ckpt_epoch_freq: 100
+  print_freq: 1000
 
   optimizer:
     type: "adam"
     lr: !!float 1e-5
   
   ema_scheduler:
-    ema_start: 1
+    ema_start: 5000
     update_ema_every: 1
     ema_decay: 0.9999

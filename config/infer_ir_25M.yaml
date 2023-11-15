@@ -1,6 +1,6 @@
-name: INFER_m3fd_6M_512
+name: INFER_m3fd_25M_512
 phase: test
-gpu_ids: [7]
+gpu_ids: [6]
 
 # Adding IR to the input
 ir: True
@@ -12,7 +12,7 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: /home/allen/Documents/MIE288/sr3_server4/m3fd_512_6M_E825
+  resume_state: /home/allen/Documents/MIE288/sr3_server4/m3fd_512_25M_E750
 
 # Dataset settings
 datasets:
@@ -37,8 +37,8 @@ model:
     # in_channel: 9  # RGB + IR + Noise
     in_channel: 7  # RGB + IR + Noise
     out_channel: 3
-    inner_channel: 64
-    norm_groups: 16
+    inner_channel: 128
+    norm_groups: 32
     channel_multiplier: [1,1,2,2,4,4]
     attn_res: [8,16,32]
     res_blocks: 1

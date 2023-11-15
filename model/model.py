@@ -47,7 +47,9 @@ class DDPM():
         self.schedule_phase = None
 
         # EMA
-        if opt['train']['ema_scheduler'] is not None:
+        if opt['test']:
+            self.ema_scheduler = None
+        elif opt['train']['ema_scheduler']:
             self.ema_scheduler = opt['train']['ema_scheduler']
             self.netG_EMA = copy.deepcopy(self.netG)
             self.EMA = EMA(beta=self.ema_scheduler['ema_decay'])
@@ -189,7 +191,7 @@ class DDPM():
         self.netG.train()
 
         # Eval EMA model if exists
-        if self.netG_EMA:
+        if self.ema_scheduler:
             # logger.info('EMA evaluation start:')
             with torch.no_grad():
                 if isinstance(self.netG_EMA, nn.DataParallel):
@@ -247,7 +249,7 @@ class DDPM():
             out_dict['IR'] = self.data['IR'].detach().float().cpu()
         if 'HR' in self.data:
             out_dict['HR'] = self.data['HR'].detach().float().cpu()
-        if self.SR_EMA is not None:
+        if self.ema_scheduler is not None:
             out_dict['SR_EMA'] = self.SR_EMA.detach().float().cpu()
         return out_dict
 
@@ -370,6 +372,7 @@ class DDPM():
                     del state_dict[key]
 
             network.load_state_dict(state_dict, strict=False)
+            logger.info('Weights loaded.')
 
             ### Optimizer
             # if self.opt['phase'] == 'train':
@@ -381,6 +384,7 @@ class DDPM():
 
                 self.begin_step = opt['iter']
                 self.begin_epoch = opt['epoch']
+                logger.info('Optimizer loaded.')
             
             ### EMA model
             if os.path.exists(ema_path):
@@ -408,6 +412,7 @@ class DDPM():
                         del state_dict[key]
 
                 network.load_state_dict(state_dict, strict=False)
+                logger.info('EMA model weights loaded.')
     
 
     def set_device(self, x):
@@ -432,7 +437,11 @@ class DDPM():
         net_desc = str(network)
         num_params = sum(map(lambda x: x.numel(), network.parameters()))
 
-        noisy = self.set_device(torch.randn(1,6,256,256))
+        if not self.opt['ir']:
+            noisy = self.set_device(torch.randn(1,6,256,256))
+        else:
+            noisy = self.set_device(torch.randn(1,9,256,256))
+            # noisy = self.set_device(torch.randn(1,7,256,256))
         timestep = self.set_device(torch.randint(low=0, high=1000, size=(1,)))
         macs, params = profile(network.denoise_fn, inputs=(noisy, timestep,))
 

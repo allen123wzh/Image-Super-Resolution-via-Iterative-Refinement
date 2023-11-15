@@ -8,7 +8,7 @@ class LRHRDataset(Dataset):
     def __init__(self, dataroot, split='train', 
                  hr_mean=[0.5, 0.5, 0.5], hr_std=[0.5, 0.5, 0.5], 
                  lr_mean=[0.0789, 0.0594, 0.0520], lr_std=[0.0754, 0.0638, 0.0614], # FFHQ_LL
-                 ir_mean=[0.44, 0.44, 0.44], ir_std=[0.1, 0.1, 0.1],
+                 ir_mean=[0.44], ir_std=[0.1],
                  ir = False,
                  data_len=-1):
 
@@ -56,26 +56,18 @@ class LRHRDataset(Dataset):
 
             if self.ir:
                 img_IR = Image.open(self.ir_path[index]).convert("RGB")
+                # img_IR = Image.open(self.ir_path[index]).convert("L")
                 img_IR = self.ir_transform(img_IR)
                 return {'HR': img_HR, 'LR': img_LR, 'IR': img_IR, 'Index': index}
             else:
                 return {'HR': img_HR, 'LR': img_LR, 'Index': index}
-
-            # [img_HR, img_LR, img_hiseq] = Util.transform_augment(
-            #     [img_HR, img_LR, img_hiseq], split=self.split, min_max=(-1, 1))
-            
-            # return {'HR': img_HR, 'SR': img_LR, 'LR': img_LR, 'hiseq': img_hiseq, 'Index': index}
         else:
             if self.ir:
                 img_IR = Image.open(self.ir_path[index]).convert("RGB")
+                # img_IR = Image.open(self.ir_path[index]).convert("L")
                 img_IR = self.ir_transform(img_IR)
                 return {'LR': img_LR, 'IR': img_IR, 'Index': index}
             else:
                 return {'LR': img_LR, 'Index': index}
-            
-            # [img_LR, img_hiseq] = Util.transform_augment(
-            #     [img_LR, img_hiseq], split=self.split, min_max=(-1, 1))
-            
-            # return {'SR': img_LR, 'LR': img_LR, 'hiseq': img_hiseq, 'Index': index}            
 
         

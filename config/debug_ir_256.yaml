@@ -12,43 +12,42 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: /home/allen/Documents/MIE288/sr3_server4/E96
+  resume_state: /home/allen/Documents/MIE288/sr3_server4/E146
 
 # Dataset settings
 datasets:
   train:
-    name: jenny_ir_synth
+    name: m3fd_detection
     # mode: HR
-    dataroot: "data/dark/jenny_train_256_256_gamma_1.3_1.5"
-    # l_resolution: 256
-    # r_resolution: 256
+    dataroot: "data/fuse/m3fd_detect_256_192"
     batch_size: 2
     num_workers: 8
     shuffle: True
-    data_len: 190
-    norm:
-      # hr_mean: [0.5, 0.5, 0.5]
-      # hr_std: [0.5, 0.5, 0.5]
-      lr_mean: [0.0789, 0.0594, 0.0520]
-      lr_std: [0.0754, 0.0638, 0.0614]
-      ir_mean: [0.44, 0.44, 0.44]
-      ir_std: [0.1, 0.1, 0.1]
-
-  val:
-    name: jenny_ir_synth
-    # mode: LRHR
-    dataroot: "data/dark/jenny_train_256_256_gamma_1.3_1.5"
-    # l_resolution: 256
-    # r_resolution: 256
-    batch_size: 1
-    data_len: 1
+    data_len: -1
     norm:
       hr_mean: [0.5, 0.5, 0.5]
       hr_std: [0.5, 0.5, 0.5]
-      lr_mean: [0.0789, 0.0594, 0.0520]
-      lr_std: [0.0754, 0.0638, 0.0614]
-      ir_mean: [0.44, 0.44, 0.44]
-      ir_std: [0.1, 0.1, 0.1]
+      lr_mean: [0.503, 0.507, 0.492]
+      lr_std: [0.189, 0.193, 0.207]
+      ir_mean: [0.33, 0.33, 0.33]
+      ir_std: [0.198, 0.198, 0.198]
+
+  val:
+    name: m3fd_fusion
+    # mode: LRHR
+    dataroot: "data/fuse/m3fd_fusion_256_192"
+    # l_resolution: 256
+    # r_resolution: 256
+    batch_size: 1
+    data_len: 2
+    norm:
+      hr_mean: [0.5, 0.5, 0.5]
+      hr_std: [0.5, 0.5, 0.5]
+      lr_mean: [0.503, 0.507, 0.492]
+      lr_std: [0.189, 0.193, 0.207]
+      ir_mean: [0.33, 0.33, 0.33]
+      ir_std: [0.198, 0.198, 0.198]
+
 
 # Model architecture
 model:
@@ -57,13 +56,13 @@ model:
   torch_compile: False
 
   unet:
-    in_channel: 9
+    in_channel: 9  # RGB + IR + Noise
     out_channel: 3
-    inner_channel: 64
+    inner_channel: 160
     norm_groups: 16
-    channel_multiplier: [1,2,4,8,16]
-    attn_res: [16]
-    res_blocks: 1
+    channel_multiplier: [1,1,2,2,4,4]
+    attn_res: [8,16,32]
+    res_blocks: 2
     dropout: 0
   
   beta_schedule:
@@ -93,9 +92,9 @@ train:
 
   optimizer:
     type: "adam"
-    lr: !!float 3e-6
+    lr: !!float 2e-5
   
   ema_scheduler:
-    step_start_ema: 5000
+    ema_start: 5000
     update_ema_every: 1
     ema_decay: 0.9999

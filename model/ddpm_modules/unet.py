@@ -132,7 +132,8 @@ class AdaptiveGroupNorm(nn.Module):
     def __init__(self, feat_dim, emb_dim, norm_groups=32):
         super().__init__()
         self.norm = nn.GroupNorm(norm_groups, feat_dim)
-        self.emb = nn.Linear(emb_dim, feat_dim*2)
+        self.emb = nn.Sequential(nn.SiLU(),
+                                 nn.Linear(emb_dim, feat_dim*2))
     
     def forward(self, feat, time_emb):
         emb = self.emb(time_emb)[:,:,None,None]
@@ -143,10 +144,11 @@ class AdaptiveGroupNorm(nn.Module):
 
 class BigGANResBlock(nn.Module):
     def __init__(self, dim, dim_out, time_emb_dim, dropout=0, norm_groups=32,
-                 up=False, down=False, dwconv=False, bneck=True, AdaGN_all=True):
+                 up=False, down=False, dwconv=False, bneck=True, AdaGN_all=True, AdaGN_3=True):
         super().__init__()
         
         self.AdaGN_all = AdaGN_all
+        self.AdaGN_3 = AdaGN_3
         self.norm_groups = norm_groups
         self.up_block = Upsample() if up else None
         self.down_block = Downsample() if down else None
@@ -212,24 +214,29 @@ class BigGANResBlock(nn.Module):
                     hidden_dim = dim//4
                     hidden_norm_groups = norm_groups//4
                     # 1. AdaGN + Act + 1x1 Conv down
-                    self.norm1 = AdaptiveGroupNorm(dim, time_emb_dim, norm_groups)
+                    if not self.AdaGN_3:
+                        self.norm1 = AdaptiveGroupNorm(dim, time_emb_dim, norm_groups)
+                    else:
+                        self.norm1 = nn.GroupNorm(norm_groups, dim)
                     self.conv1 = nn.Sequential(nn.SiLU(),
-                                               nn.Conv2d(dim, hidden_dim, 1, padding=0))
+                                            nn.Conv2d(dim, hidden_dim, 1, padding=0))
                     # 2. AdaGN + Act + Up/Downsample + 3x3 Conv
+                    # if not self.AdaGN_2:
                     self.norm2 = AdaptiveGroupNorm(hidden_dim, time_emb_dim, hidden_norm_groups)
+                    # else:
+                        # self.norm2 = nn.GroupNorm(hidden_norm_groups, hidden_dim)
                     self.conv2 = nn.Sequential(nn.SiLU(), 
-                                               nn.Dropout(p=dropout),
-                                               nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1))
+                                            nn.Dropout(p=dropout),
+                                            nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1))
                     # 3. AdaGN + Act + 3x3 Conv
                     self.norm3 = AdaptiveGroupNorm(hidden_dim, time_emb_dim, hidden_norm_groups)
                     self.conv3 = nn.Sequential(nn.SiLU(),
-                                               nn.Dropout(p=dropout),
-                                               nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1))
+                                            nn.Dropout(p=dropout),
+                                            nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1))
                     # 4. AdaGN + Act + 1x1 Conv up
                     self.norm4 = AdaptiveGroupNorm(hidden_dim, time_emb_dim, hidden_norm_groups)
                     self.conv4 = nn.Sequential(nn.SiLU(),
-                                               nn.Conv2d(hidden_dim, dim_out, 1, padding=0))
-
+                                            nn.Conv2d(hidden_dim, dim_out, 1, padding=0))
         else:
             self.in_norm = nn.Sequential(
                 nn.GroupNorm(norm_groups, dim),
@@ -275,7 +282,10 @@ class BigGANResBlock(nn.Module):
             # Residual add
             return self.skip_connection(x)+h
         else: 
-            h = self.conv1(self.norm1(x, time_emb))
+            if not self.AdaGN_3:
+                h = self.conv1(self.norm1(x, time_emb))
+            else:
+                h = self.conv1(self.norm1(x))
             if self.up_block:
                 h = self.conv2[:1](self.norm2(h, time_emb))
                 h = self.up_block(h)
