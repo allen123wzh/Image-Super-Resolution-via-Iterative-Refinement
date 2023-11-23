@@ -1,4 +1,4 @@
-name: INFER_m3fd_6M_512
+name: ddim_INFER_m3fd_6M_512
 phase: test
 gpu_ids: [7]
 
@@ -12,8 +12,8 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: /home/allen/Documents/MIE288/sr3_server4/m3fd_512_6M_E825
-
+  resume_state: /media/user/990pro/allen/sr3_server4/m3fd_512_6M_E825
+  
 # Dataset settings
 datasets:
   test:
@@ -48,6 +48,7 @@ model:
     test:
       schedule: cosine
       n_timestep: 1000
+      ddim_timestep: 5
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2      
       

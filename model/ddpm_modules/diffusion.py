@@ -122,6 +122,10 @@ class GaussianDiffusion(nn.Module):
 
         timesteps, = betas.shape
         self.num_timesteps = int(timesteps)
+
+        if schedule_opt['ddim_timestep']:
+            self.ddim_timesteps = int(schedule_opt['ddim_timestep'])
+        
         self.register_buffer('betas', to_torch(betas))
         self.register_buffer('alphas_cumprod', to_torch(alphas_cumprod))
         self.register_buffer('alphas_cumprod_prev',
@@ -261,6 +265,61 @@ class GaussianDiffusion(nn.Module):
         else:
             return ret_img[-1]
 
+
+
+
+
+    @torch.no_grad()
+    def ddim_sample(self, x_in, continuous=False):
+        batch, device, total_timesteps, sampling_timesteps = x_in.shape[0], self.betas.device, self.num_timesteps, self.ddim_timesteps
+        eta = 0 # control the noise injected to DDIM
+
+        times = torch.linspace(-1, total_timesteps - 1, steps = sampling_timesteps + 1)   # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps
+        times = list(reversed(times.int().tolist()))
+        time_pairs = list(zip(times[:-1], times[1:])) # [(T-1, T-2), (T-2, T-3), ..., (1, 0), (0, -1)]
+
+        condition_rgb = x_in[:,:3,:,:]
+        img = torch.randn(condition_rgb.shape, device = device)
+        imgs = [condition_rgb]
+
+        for time, time_next in tqdm(time_pairs, desc = 'sampling loop time step'):
+            t = torch.full((batch,), time, device = device, dtype = torch.long)
+            
+            pred_noise = self.denoise_fn(torch.cat([x_in, img], dim=1),t)
+            x_start = self.predict_start_from_noise(img, t=t, noise=pred_noise)
+            x_start.clamp_(-1., 1.)
+
+            if self.global_corrector is not None:
+                x_start = self.global_corrector(x_start, t)
+            x_start.clamp_(-1., 1.)
+
+            # pred_noise, x_start, *_ = self.model_predictions(img, time_cond, self_cond, clip_x_start = True)
+
+            imgs.append(img)
+
+            if time_next < 0:
+                img = x_start
+                continue
+
+            alpha = self.alphas_cumprod[time]
+            alpha_next = self.alphas_cumprod[time_next]
+
+            sigma = eta * ((1 - alpha / alpha_next) * (1 - alpha_next) / (1 - alpha)).sqrt()
+            c = (1 - alpha_next - sigma ** 2).sqrt()
+
+            noise = torch.randn_like(img)
+
+            img = x_start * alpha_next.sqrt() + \
+                  c * pred_noise + \
+                  sigma * noise
+
+        ret = img if not continuous else torch.stack(imgs, dim = 0)
+        return ret
+
+
+
+
+
     # @torch.no_grad()
     # def sample(self, batch_size=1, continous=False):
     #     image_size = self.image_size
@@ -268,9 +327,9 @@ class GaussianDiffusion(nn.Module):
     #     return self.p_sample_loop((batch_size, channels, image_size, image_size), continous)
 
 
-    @torch.no_grad()
-    def super_resolution(self, x_in, continous=False):
-        return self.p_sample_loop(x_in, continous)
+    # @torch.no_grad()
+    # def super_resolution(self, x_in, continous=False):
+    #     return self.p_sample_loop(x_in, continous)
 
 
     @torch.no_grad()

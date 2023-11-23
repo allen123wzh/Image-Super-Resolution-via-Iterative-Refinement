@@ -9,7 +9,7 @@ import os
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/infer_ir_25M.yaml',
+    parser.add_argument('-c', '--config', type=str, default='config/infer_ir_6M.yaml',
                         help='YAML file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val', 'test'], default='test')
 
@@ -60,26 +60,26 @@ if __name__ == "__main__":
     for _,  test_data in enumerate(dataloader):
         idx += 1
         diffusion.feed_data(test_data)
-        diffusion.test(continous=True)
+        diffusion.test(ddim=True, continous=False)
         visuals = diffusion.get_current_visuals()
 
         lr_img = tensor2img(visuals['LR'])  # uint8
         ir_img = tensor2img(visuals['IR'])  # uint8
 
-        sr_img_mode = 'grid'
+        sr_img_mode = 'single'
         if sr_img_mode == 'single':
             # single img series
             sr_img = visuals['SR']  # uint8
             sample_num = sr_img.shape[0]
             for iter in range(0, sample_num):
-                save_img(tensor2img(sr_img[iter]), '{}/{}_{}_sr_{}.png'.format(result_path, current_step, idx, iter))
+                save_img(tensor2img(sr_img[iter]), f'{result_path}/{test_data["fname"][0]}.png')
         else:
             # grid img
             sr_img = tensor2img(visuals['SR'])  # uint8
             save_img(sr_img, '{}/{}_{}_sr_process.png'.format(result_path, current_step, idx))
             save_img(tensor2img(visuals['SR'][-1]), '{}/{}_{}_sr.png'.format(result_path, current_step, idx))
 
-        save_img(lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
+        # save_img(lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
 
 
     logger.info('# Inference end#')

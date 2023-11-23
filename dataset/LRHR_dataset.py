@@ -3,6 +3,7 @@ from torch.utils.data import Dataset
 import dataset.data_util as Util
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
+from pathlib import Path
 
 class LRHRDataset(Dataset):
     def __init__(self, dataroot, split='train', 
@@ -44,30 +45,29 @@ class LRHRDataset(Dataset):
     def __getitem__(self, index):
 
         img_orig_LR = Image.open(self.lr_path[index]).convert("RGB")
-        
+        fname = Path(self.lr_path[index]).stem
+
         img_LR = self.lr_transform(img_orig_LR)
         img_orig_LR = self.hr_transform(img_orig_LR)
-
-        # img_hiseq = T.functional.equalize(img_LR)
 
         if self.split != 'test':
             img_HR = Image.open(self.hr_path[index]).convert("RGB")  # HR img
             img_HR = self.hr_transform(img_HR)
 
             if self.ir:
-                img_IR = Image.open(self.ir_path[index]).convert("RGB")
-                # img_IR = Image.open(self.ir_path[index]).convert("L")
+                # img_IR = Image.open(self.ir_path[index]).convert("RGB")
+                img_IR = Image.open(self.ir_path[index]).convert("L")
                 img_IR = self.ir_transform(img_IR)
-                return {'HR': img_HR, 'LR': img_LR, 'IR': img_IR, 'Index': index}
+                return {'HR': img_HR, 'LR': img_LR, 'IR': img_IR, 'Index': index, "fname": fname}
             else:
-                return {'HR': img_HR, 'LR': img_LR, 'Index': index}
+                return {'HR': img_HR, 'LR': img_LR, 'Index': index, "fname": fname}
         else:
             if self.ir:
-                img_IR = Image.open(self.ir_path[index]).convert("RGB")
-                # img_IR = Image.open(self.ir_path[index]).convert("L")
+                # img_IR = Image.open(self.ir_path[index]).convert("RGB")
+                img_IR = Image.open(self.ir_path[index]).convert("L")
                 img_IR = self.ir_transform(img_IR)
-                return {'LR': img_LR, 'IR': img_IR, 'Index': index}
+                return {'LR': img_LR, 'IR': img_IR, 'Index': index, "fname": fname}
             else:
-                return {'LR': img_LR, 'Index': index}
+                return {'LR': img_LR, 'Index': index, "fname": fname}
 
         

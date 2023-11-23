@@ -47,7 +47,7 @@ class DDPM():
         self.schedule_phase = None
 
         # EMA
-        if opt['test']:
+        if opt['phase']=='test':
             self.ema_scheduler = None
         elif opt['train']['ema_scheduler']:
             self.ema_scheduler = opt['train']['ema_scheduler']
@@ -92,7 +92,7 @@ class DDPM():
                 optim_params2, lr=opt['train']["optimizer"]["lr"])
             
             self.log_dict = OrderedDict()
-
+        
         self.load_network(rank=self.opt['local_rank'] if self.opt['local_rank']!=-1 else 0)
         
         if opt['local_rank'] in {-1,0}:
@@ -173,39 +173,71 @@ class DDPM():
         # set log
         # self.log_dict['l_pix'] = l_pix.item()
 
-    def test(self, continous=False):
+    def test(self, ddim=False, continous=False):
         self.netG.eval()
-        with torch.no_grad():
-            if isinstance(self.netG, nn.DataParallel):
-                if 'IR' in self.data:
-                    self.SR = self.netG.module.super_resolution(
-                        torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)           
-                else:
-                    self.SR = self.netG.module.super_resolution(self.data['LR'], continous)            
-            else:
-                if 'IR' in self.data:
-                    self.SR = self.netG.super_resolution(
-                        torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)
-                else:
-                    self.SR = self.netG.super_resolution(self.data['LR'], continous)            
-        self.netG.train()
 
-        # Eval EMA model if exists
-        if self.ema_scheduler:
-            # logger.info('EMA evaluation start:')
+        if ddim:
             with torch.no_grad():
-                if isinstance(self.netG_EMA, nn.DataParallel):
+                if isinstance(self.netG, nn.DataParallel):
                     if 'IR' in self.data:
-                        self.SR_EMA = self.netG_EMA.module.super_resolution(
+                        self.SR = self.netG.module.ddim_sample(
                             torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)           
                     else:
-                        self.SR_EMA = self.netG_EMA.module.super_resolution(self.data['LR'], continous)            
+                        self.SR = self.netG.module.ddim_sample(self.data['LR'], continous)            
                 else:
                     if 'IR' in self.data:
-                        self.SR_EMA = self.netG_EMA.super_resolution(
+                        self.SR = self.netG.ddim_sample(
                             torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)
                     else:
-                        self.SR_EMA = self.netG_EMA.super_resolution(self.data['LR'], continous)            
+                        self.SR = self.netG.ddim_sample(self.data['LR'], continous)            
+            self.netG.train()
+
+            # Eval EMA model if exists
+            if self.ema_scheduler:
+                with torch.no_grad():
+                    if isinstance(self.netG_EMA, nn.DataParallel):
+                        if 'IR' in self.data:
+                            self.SR_EMA = self.netG_EMA.module.ddim_sample(
+                                torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)           
+                        else:
+                            self.SR_EMA = self.netG_EMA.module.ddim_sample(self.data['LR'], continous)            
+                    else:
+                        if 'IR' in self.data:
+                            self.SR_EMA = self.netG_EMA.ddim_sample(
+                                torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)
+                        else:
+                            self.SR_EMA = self.netG_EMA.ddim_sample(self.data['LR'], continous)            
+        else:
+            with torch.no_grad():
+                if isinstance(self.netG, nn.DataParallel):
+                    if 'IR' in self.data:
+                        self.SR = self.netG.module.p_sample_loop(
+                            torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)           
+                    else:
+                        self.SR = self.netG.module.p_sample_loop(self.data['LR'], continous)            
+                else:
+                    if 'IR' in self.data:
+                        self.SR = self.netG.p_sample_loop(
+                            torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)
+                    else:
+                        self.SR = self.netG.p_sample_loop(self.data['LR'], continous)            
+            self.netG.train()
+
+            # Eval EMA model if exists
+            if self.ema_scheduler:
+                with torch.no_grad():
+                    if isinstance(self.netG_EMA, nn.DataParallel):
+                        if 'IR' in self.data:
+                            self.SR_EMA = self.netG_EMA.module.p_sample_loop(
+                                torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)           
+                        else:
+                            self.SR_EMA = self.netG_EMA.module.p_sample_loop(self.data['LR'], continous)            
+                    else:
+                        if 'IR' in self.data:
+                            self.SR_EMA = self.netG_EMA.p_sample_loop(
+                                torch.cat([self.data['LR'], self.data['IR']], dim=1), continous)
+                        else:
+                            self.SR_EMA = self.netG_EMA.p_sample_loop(self.data['LR'], continous)            
 
 
     def sample(self, batch_size=1, continous=False):
@@ -418,7 +450,7 @@ class DDPM():
     def set_device(self, x):
         if isinstance(x, dict):
             for key, item in x.items():
-                if item is not None:
+                if item is not None and type(item) is not list:
                     x[key] = item.to(self.device)
         elif isinstance(x, list):
             for item in x:
@@ -438,9 +470,9 @@ class DDPM():
         num_params = sum(map(lambda x: x.numel(), network.parameters()))
 
         if not self.opt['ir']:
-            noisy = self.set_device(torch.randn(1,6,256,256))
+            noisy = self.set_device(torch.randn(1,6,512,512))
         else:
-            noisy = self.set_device(torch.randn(1,9,256,256))
+            noisy = self.set_device(torch.randn(1,7,512,512))
             # noisy = self.set_device(torch.randn(1,7,256,256))
         timestep = self.set_device(torch.randint(low=0, high=1000, size=(1,)))
         macs, params = profile(network.denoise_fn, inputs=(noisy, timestep,))
