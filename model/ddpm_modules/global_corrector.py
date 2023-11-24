@@ -1,9 +1,8 @@
-import functools
 import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from .unet import ResBlock
 
 class Condition(nn.Module):
     def __init__(self, in_nc=3, nf=32):
@@ -24,6 +23,7 @@ class Condition(nn.Module):
 
         return out
 
+
 class PositionalEncoding(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -38,6 +38,7 @@ class PositionalEncoding(nn.Module):
         encoding = torch.cat(
             [torch.sin(encoding), torch.cos(encoding)], dim=-1)
         return encoding
+
 
 class FeatureWiseAffine(nn.Module):
     def __init__(self, in_channels, out_channels, use_affine_level=False):
@@ -57,9 +58,6 @@ class FeatureWiseAffine(nn.Module):
             x = x + self.noise_func(noise_embed).view(batch, -1, 1, 1)
         return x
 
-class Swish(nn.Module):
-    def forward(self, x):
-        return x * torch.sigmoid(x)
 
 # 3layers with control
 class GlobalCorrector(nn.Module):
@@ -69,7 +67,8 @@ class GlobalCorrector(nn.Module):
         self.noise_level_mlp = nn.Sequential(
                 PositionalEncoding(base_nf),
                 nn.Linear(base_nf, base_nf * 4),
-                Swish(),
+                # Swish(),
+                nn.SiLU(),
                 nn.Linear(base_nf * 4, base_nf)
             )
 

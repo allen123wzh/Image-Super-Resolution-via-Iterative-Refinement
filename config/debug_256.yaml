@@ -34,7 +34,7 @@ datasets:
 # Model architecture
 model:
   which_model_G: ddpm
-  finetune_norm: False
+  # finetune_norm: False
   torch_compile: False
 
   unet:

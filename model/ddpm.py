@@ -69,21 +69,9 @@ class DDPM():
 
         if self.opt['phase'] == 'train':
             self.netG.train()
-            # find the parameters to optimize
-            if opt['model']['finetune_norm']:
-                optim_params1 = []
-                optim_params2 = list(self.netG.global_corrector.parameters())
-                for k, v in self.netG.denoise_fn.named_parameters():
-                    v.requires_grad = False
-                    if k.find('downs.0.') >= 0:
-                        v.requires_grad = True
-                        # v.data.zero_()
-                        optim_params1.append(v)
-                        logger.info(
-                            'Params [{:s}] initialized to 0 and will optimize.'.format(k))
-            else:
-                optim_params1 = list(self.netG.denoise_fn.parameters())
-                optim_params2 = list(self.netG.global_corrector.parameters())
+
+            optim_params1 = list(self.netG.denoise_fn.parameters())
+            optim_params2 = list(self.netG.global_corrector.parameters())
 
             self.optG1 = torch.optim.AdamW(
                 optim_params1, lr=opt['train']["optimizer"]["lr"])
@@ -95,16 +83,14 @@ class DDPM():
         
         self.load_network(rank=self.opt['local_rank'] if self.opt['local_rank']!=-1 else 0)
         
+
         if opt['local_rank'] in {-1,0}:
             self.print_network()
+        
         
         ### multi-gpu
         if len(opt['gpu_ids'])>1:
             assert torch.cuda.is_available()
-
-            ### DP
-            # self.netG.denoise_fn = nn.DataParallel(self.netG.denoise_fn)
-            # self.netG.global_corrector = nn.DataParallel(self.netG.global_corrector)
 
             ### DDP
             self.netG.denoise_fn = DDP(self.netG.denoise_fn, device_ids=[opt['local_rank']])
@@ -122,11 +108,7 @@ class DDPM():
     def feed_data(self, data):
         self.data = self.set_device(data)
 
-    def optimize_parameters(self, it=None, grad_accum=1):
-        ##########################
-        ##########################
-        ##########################
-        
+    def optimize_parameters(self, it=None, grad_accum=1):        
         # for DDP grad accum efficiency
         my_context1 = self.netG.denoise_fn.no_sync if self.opt['local_rank'] != -1 and it % grad_accum != 0 else nullcontext
         my_context2 = self.netG.global_corrector.no_sync if self.opt['local_rank'] != -1 and it % grad_accum != 0 else nullcontext
@@ -163,15 +145,6 @@ class DDPM():
                 if it > self.ema_scheduler['ema_start'] and it % self.ema_scheduler['update_ema_every'] == 0:
                     self.EMA.update_model_average(self.netG_EMA, self.netG)
 
-        #########################
-        ##########################
-        ##########################
-
-        # l_pix.backward()
-        # self.optG.step()
-
-        # set log
-        # self.log_dict['l_pix'] = l_pix.item()
 
     def test(self, ddim=False, continous=False):
         self.netG.eval()
@@ -286,8 +259,8 @@ class DDPM():
         return out_dict
 
 
-    def print_network(self):
-        net_desc, num_params, flops, params = self.get_network_description(self.netG)
+    def print_network(self, img_size=256):
+        net_desc, num_params, flops, params = self.get_network_description(self.netG, img_size)
         if isinstance(self.netG, nn.DataParallel):
             net_struc_str = '{} - {}'.format(self.netG.__class__.__name__,
                                              self.netG.module.__class__.__name__)
@@ -297,7 +270,7 @@ class DDPM():
         logger.info(
             'Network G structure: {}, with parameters: {:,d}'.format(net_struc_str, num_params))
         logger.info(
-            'UNet flops @ 256x256: {:.2f}G, with parameters: {:,d}'.format(flops/1e9, params))
+            'UNet flops @ {}x{}: {:.2f}G, with parameters: {:,d}'.format(img_size,img_size,flops/1e9, params))
         logger.info(net_desc)
 
 
@@ -461,7 +434,7 @@ class DDPM():
         return x
 
 
-    def get_network_description(self, net):
+    def get_network_description(self, net, img_size=256):
         '''Get the string and total parameters of the network'''
         network = copy.deepcopy(net)
         if isinstance(network, nn.DataParallel):
@@ -470,14 +443,12 @@ class DDPM():
         num_params = sum(map(lambda x: x.numel(), network.parameters()))
 
         if not self.opt['ir']:
-            noisy = self.set_device(torch.randn(1,6,512,512))
+            noisy = self.set_device(torch.randn(1,6,img_size,img_size))
         else:
-            noisy = self.set_device(torch.randn(1,7,512,512))
-            # noisy = self.set_device(torch.randn(1,7,256,256))
+            noisy = self.set_device(torch.randn(1,7,img_size,img_size))
         timestep = self.set_device(torch.randint(low=0, high=1000, size=(1,)))
         macs, params = profile(network.denoise_fn, inputs=(noisy, timestep,))
 
         del network
-
         return net_desc, num_params, 2*macs, int(params)
 

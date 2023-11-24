@@ -31,7 +31,7 @@ datasets:
 model:
   which_model_G: ddpm
   finetune_norm: False
-  torch_compile: True
+  torch_compile: False
 
   unet:
     # in_channel: 9  # RGB + IR + Noise
@@ -48,7 +48,7 @@ model:
     test:
       schedule: cosine
       n_timestep: 1000
-      ddim_timestep: 5
+      ddim_timestep: 2
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2      
       

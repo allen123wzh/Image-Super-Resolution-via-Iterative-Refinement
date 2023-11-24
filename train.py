@@ -14,12 +14,12 @@ import random
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/m3fd_ir_rgb_6M.yaml',
-                        help='JSON file for configuration')
+    # parser.add_argument('-c', '--config', type=str, default='config/m3fd_ir_rgb_6M.yaml',
+    #                     help='JSON file for configuration')
     # parser.add_argument('-c', '--config', type=str, default='config/ll_bgd1x_ffhq_256.yaml',
     #                     help='JSON file for configuration')
-    # parser.add_argument('-c', '--config', type=str, default='config/debug_ir_256.yaml',
-    #                         help='JSON file for configuration')
+    parser.add_argument('-c', '--config', type=str, default='config/debug_256.yaml',
+                            help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                             help='Run either train(training) or val(generation)', default='train')
 

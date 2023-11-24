@@ -8,32 +8,10 @@ import numpy as np
 from tqdm import tqdm
 
 
-def _warmup_beta(linear_start, linear_end, n_timestep, warmup_frac):
-    betas = linear_end * np.ones(n_timestep, dtype=np.float64)
-    warmup_time = int(n_timestep * warmup_frac)
-    betas[:warmup_time] = np.linspace(
-        linear_start, linear_end, warmup_time, dtype=np.float64)
-    return betas
-
-
 def make_beta_schedule(schedule, n_timestep, linear_start=1e-4, linear_end=2e-2, cosine_s=8e-3):
-    if schedule == 'quad':
-        betas = np.linspace(linear_start ** 0.5, linear_end ** 0.5,
-                            n_timestep, dtype=np.float64) ** 2
-    elif schedule == 'linear':
+    if schedule == 'linear':
         betas = np.linspace(linear_start, linear_end,
                             n_timestep, dtype=np.float64)
-    elif schedule == 'warmup10':
-        betas = _warmup_beta(linear_start, linear_end,
-                             n_timestep, 0.1)
-    elif schedule == 'warmup50':
-        betas = _warmup_beta(linear_start, linear_end,
-                             n_timestep, 0.5)
-    elif schedule == 'const':
-        betas = linear_end * np.ones(n_timestep, dtype=np.float64)
-    elif schedule == 'jsd':  # 1/T, 1/(T-1), 1/(T-2), ..., 1
-        betas = 1. / np.linspace(n_timestep,
-                                 1, n_timestep, dtype=np.float64)
     elif schedule == "cosine":
         timesteps = (
             torch.arange(n_timestep + 1, dtype=torch.float64) /
@@ -79,7 +57,6 @@ class GaussianDiffusion(nn.Module):
     def __init__(
         self,
         denoise_fn,
-        # image_size,
         channels=3,
         loss_type='l1',
         conditional=True,
@@ -88,7 +65,6 @@ class GaussianDiffusion(nn.Module):
     ):
         super().__init__()
         self.channels = channels
-        # self.image_size = image_size
         self.denoise_fn = denoise_fn
         self.conditional = conditional
         self.loss_type = loss_type
@@ -266,9 +242,6 @@ class GaussianDiffusion(nn.Module):
             return ret_img[-1]
 
 
-
-
-
     @torch.no_grad()
     def ddim_sample(self, x_in, continuous=False):
         batch, device, total_timesteps, sampling_timesteps = x_in.shape[0], self.betas.device, self.num_timesteps, self.ddim_timesteps
@@ -293,8 +266,6 @@ class GaussianDiffusion(nn.Module):
                 x_start = self.global_corrector(x_start, t)
             x_start.clamp_(-1., 1.)
 
-            # pred_noise, x_start, *_ = self.model_predictions(img, time_cond, self_cond, clip_x_start = True)
-
             imgs.append(img)
 
             if time_next < 0:
@@ -315,21 +286,6 @@ class GaussianDiffusion(nn.Module):
 
         ret = img if not continuous else torch.stack(imgs, dim = 0)
         return ret
-
-
-
-
-
-    # @torch.no_grad()
-    # def sample(self, batch_size=1, continous=False):
-    #     image_size = self.image_size
-    #     channels = self.channels
-    #     return self.p_sample_loop((batch_size, channels, image_size, image_size), continous)
-
-
-    # @torch.no_grad()
-    # def super_resolution(self, x_in, continous=False):
-    #     return self.p_sample_loop(x_in, continous)
 
 
     @torch.no_grad()
