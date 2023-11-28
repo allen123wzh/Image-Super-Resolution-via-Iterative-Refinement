@@ -67,11 +67,31 @@ class DDPM():
             opt['model']['beta_schedule'][opt['phase']], schedule_phase=[opt['phase']])
         
 
+
+
+
+
+
+
+
         if self.opt['phase'] == 'train':
             self.netG.train()
 
-            optim_params1 = list(self.netG.denoise_fn.parameters())
-            optim_params2 = list(self.netG.global_corrector.parameters())
+            ######################
+            if opt['model']['finetune_sr']:
+                optim_params1 = []
+                for k, v in self.netG.denoise_fn.named_parameters():
+                    v.requires_grad = False
+                    if k.find('final_conv.') >= 0:
+                        v.requires_grad = True
+                        # v.data.zero_()
+                        optim_params1.append(v)
+                optim_params2 = list(self.netG.global_corrector.parameters())
+            #####################
+        
+            else:
+                optim_params1 = list(self.netG.denoise_fn.parameters())
+                optim_params2 = list(self.netG.global_corrector.parameters())
 
             self.optG1 = torch.optim.AdamW(
                 optim_params1, lr=opt['train']["optimizer"]["lr"])

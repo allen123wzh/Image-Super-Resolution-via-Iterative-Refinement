@@ -1,6 +1,6 @@
-name: 9c_m3fd_25M_bgd1x128_h512w384
+name: up_k9srcnn_bicubic_m3fd_25M_bgd1x128_h512w384
 phase: train
-gpu_ids: [0,1,2,3]
+gpu_ids: [5]
 # gpu_ids: [0]
 
 # Adding IR to the input
@@ -12,16 +12,16 @@ path:
   tb_logger: "tb_logger"
   results: "results"
   checkpoint: "checkpoint"
-  # resume_state: null
-  resume_state: experiments/ll_2GN_bgd_128_1x_norm_adamW_1e-5_ffhq_231111_233952/checkpoint/E270
+  resume_state: m3fd_512_25M_E750
+  # resume_state: /media/user/990pro/allen/sr3_server4/E700_ema_sr
 
 # Dataset settings
 datasets:
   train:
     name: m3fd_detection
     # dataroot: "data/fuse/m3fd_detect_512_384"
-    dataroot: "data/fuse/m3fd_detect_256_192"
-    batch_size: 8
+    dataroot: "data/fuse/m3fd_detect_512_384"
+    batch_size: 32
     num_workers: 8
     shuffle: True
     data_len: -1
@@ -37,7 +37,7 @@ datasets:
     name: m3fd_fusion
     dataroot: "data/fuse/m3fd_fusion_512_384"
     batch_size: 1
-    data_len: 15
+    data_len: -1
     norm:
       hr_mean: [0.5, 0.5, 0.5]
       hr_std: [0.5, 0.5, 0.5]
@@ -50,12 +50,12 @@ datasets:
 # Model architecture
 model:
   which_model_G: ddpm
-  finetune_norm: False
+  finetune_sr: True
   torch_compile: True
 
   unet:
-    in_channel: 9  # RGB + IR + Noise
-    # in_channel: 7  # RGB + IR + Noise
+    # in_channel: 9  # RGB + IR + Noise
+    in_channel: 7  # RGB + IR + Noise
     out_channel: 3
     inner_channel: 128
     norm_groups: 32
@@ -73,6 +73,7 @@ model:
     val:
       schedule: cosine
       n_timestep: 1000
+      ddim_timestep: 10
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2      
       
@@ -87,7 +88,7 @@ train:
   n_iter: 1000000
   val_epoch_freq: 100
   save_ckpt_epoch_freq: 100
-  print_freq: 1000
+  print_freq: 500
 
   optimizer:
     type: "adam"

@@ -264,6 +264,10 @@ class GaussianDiffusion(nn.Module):
 
             if self.global_corrector is not None:
                 x_start = self.global_corrector(x_start, t)
+                ######################
+                if time_next>=0:
+                    x_start = F.interpolate(x_start, scale_factor=0.5, mode='bicubic')
+                #####################
             x_start.clamp_(-1., 1.)
 
             imgs.append(img)
@@ -318,7 +322,9 @@ class GaussianDiffusion(nn.Module):
 
 
     def p_losses(self, x_in, noise=None):
-        x_start = x_in['HR']
+        x_gt = x_in['HR']
+
+        x_start = F.interpolate(x_in['HR'], scale_factor=0.5, mode='bicubic')
         [b, c, h, w] = x_start.shape    # [B, 3, H, W]
         t = torch.randint(0, self.num_timesteps, (b,),
                           device=x_start.device).long()
@@ -333,10 +339,13 @@ class GaussianDiffusion(nn.Module):
             predicted_noise = self.denoise_fn(x_noisy, t)
         else:
             if 'IR' in x_in:
+                # lr = F.interpolate(x_in['LR'], scale_factor=0.5, mode='bicubic')
+                # ir = F.interpolate(x_in['IR'], scale_factor=0.5, mode='bicubic')           
                 predicted_noise = self.denoise_fn(                  # [B, 3, H, W]
                     torch.cat([x_in['LR'], x_in['IR'], x_noisy], dim=1), t
                 )
             else:
+                # lr = F.interpolate(x_in['LR'], scale_factor=0.5, mode='bicubic')
                 predicted_noise = self.denoise_fn(
                     torch.cat([x_in['LR'], x_noisy], dim=1), t
                     )         
@@ -355,7 +364,8 @@ class GaussianDiffusion(nn.Module):
             x_recon = self.global_corrector(x_recon, t)
             x_recon.clamp_(-1., 1.)
 
-            l_recon = self.loss_func(x_recon, x_start)
+            # l_recon = self.loss_func(x_recon, x_start)
+            l_recon = self.loss_func(x_recon, x_gt)
 
             return l_noise, l_recon
         else:

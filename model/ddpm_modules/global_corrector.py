@@ -86,11 +86,20 @@ class GlobalCorrector(nn.Module):
         self.cond_shift2 = nn.Linear(cond_nf, base_nf, bias=True)
         self.cond_shift3 = nn.Linear(cond_nf, 3, bias=True)
 
-        self.conv1 = nn.Conv2d(in_nc, base_nf, 1, 1, bias=True) 
+        ##################
+        # up_conv_inner_ch = base_nf*8
+        # self.in_conv = nn.Conv2d(3, up_conv_inner_ch, 3, padding=1)
+        # self.up_conv_1 = ResBlock(up_conv_inner_ch, up_conv_inner_ch, time_emb_dim=base_nf,
+        #              up=True)
+        # self.up_conv_2 = ResBlock(up_conv_inner_ch, base_nf, time_emb_dim=base_nf)        
+        
+        # self.conv1 = nn.Conv2d(base_nf, base_nf, 1, 1, bias=True) 
+        self.conv1 = nn.Conv2d(in_nc, base_nf, kernel_size=9, stride=1, padding=4, bias=True) 
+        #################
         self.convt1 = FeatureWiseAffine(base_nf, base_nf)
-        self.conv2 = nn.Conv2d(base_nf, base_nf, 1, 1, bias=True)
+        self.conv2 = nn.Conv2d(base_nf, base_nf, kernel_size=5, stride=1, padding=2, bias=True)
         self.convt2 = FeatureWiseAffine(base_nf, base_nf)
-        self.conv3 = nn.Conv2d(base_nf, out_nc, 1, 1, bias=True)
+        self.conv3 = nn.Conv2d(base_nf, out_nc, kernel_size=5, stride=1, padding=2, bias=True)
         self.convt3 = FeatureWiseAffine(base_nf, out_nc)
 
         if act_type == 'relu':
@@ -115,8 +124,16 @@ class GlobalCorrector(nn.Module):
 
         scale3 = self.cond_scale3(cond)
         shift3 = self.cond_shift3(cond)
-        
+
         # x [N, 3, H, W]
+        # out = self.in_conv(x)
+        # out = self.up_conv_1(out, t)       
+        # out = self.up_conv_2(out, t)
+        # out = self.conv1(out)         # [N, base_nf, H, W]
+
+        x = F.interpolate(x, scale_factor=2, mode='bicubic')
+        x.clamp_(0, 1.)
+
         out = self.conv1(x)         # [N, base_nf, H, W]
         out = self.convt1(out, t)   # [N, base_nf, H, W]
         out = out * scale1.view(-1, self.base_nf, 1, 1) + shift1.view(-1, self.base_nf, 1, 1) + out
@@ -132,4 +149,5 @@ class GlobalCorrector(nn.Module):
         out = out * scale3.view(-1, self.out_nc, 1, 1) + shift3.view(-1, self.out_nc, 1, 1) + out
         if self.normal01:
             out = 2 * out - 1
+
         return out                  # [N, 3, H, W]

@@ -14,12 +14,12 @@ import random
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # parser.add_argument('-c', '--config', type=str, default='config/m3fd_ir_rgb_6M.yaml',
-    #                     help='JSON file for configuration')
-    # parser.add_argument('-c', '--config', type=str, default='config/ll_bgd1x_ffhq_256.yaml',
-    #                     help='JSON file for configuration')
-    parser.add_argument('-c', '--config', type=str, default='config/debug_256.yaml',
-                            help='JSON file for configuration')
+    # parser.add_argument('-c', '--config', type=str, default='config/m3fd_ir_rgb_25M.yaml',
+                        # help='JSON file for configuration')
+    parser.add_argument('-c', '--config', type=str, default='config/ll_bgd1x_ffhq_256.yaml',
+                        help='JSON file for configuration')
+    # parser.add_argument('-c', '--config', type=str, default='config/debug_256.yaml',
+    #                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                             help='Run either train(training) or val(generation)', default='train')
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
                     for _,  val_data in enumerate(val_loader):
                         idx += 1
                         diffusion.feed_data(val_data)
-                        diffusion.test(continous=False)
+                        diffusion.test(ddim=True, continous=False)
                         visuals = diffusion.get_current_visuals()
                         sr_img = tensor2img(visuals['SR'])  # uint8, super-res img
                         hr_img = tensor2img(visuals['HR'])  # uint8, GT hi-res
@@ -148,21 +148,21 @@ if __name__ == "__main__":
                         if 'SR_EMA' in visuals:
                             save_img(sr_ema_img, '{}/{}_{}_sr_ema.png'.format(result_path, current_step, idx))  # uint8, IR image
 
-                        if 'IR' in visuals:
-                            tb_logger.add_image(
-                                'Iter_{}'.format(current_step),
-                                # np.transpose(np.concatenate(
-                                #     (lr_img, ir_img, hr_img, sr_img), axis=1), [2, 0, 1]),
-                                # idx)
-                                np.transpose(np.concatenate(
-                                    (lr_img, hr_img, sr_img), axis=1), [2, 0, 1]),
-                                idx)
-                        else:
-                            tb_logger.add_image(
-                                'Iter_{}'.format(current_step),
-                                np.transpose(np.concatenate(
-                                    (lr_img, hr_img, sr_img), axis=1), [2, 0, 1]),
-                                idx)
+                        # if 'IR' in visuals:
+                        #     tb_logger.add_image(
+                        #         'Iter_{}'.format(current_step),
+                        #         # np.transpose(np.concatenate(
+                        #         #     (lr_img, ir_img, hr_img, sr_img), axis=1), [2, 0, 1]),
+                        #         # idx)
+                        #         np.transpose(np.concatenate(
+                        #             (lr_img, hr_img, sr_img), axis=1), [2, 0, 1]),
+                        #         idx)
+                        # else:
+                        #     tb_logger.add_image(
+                        #         'Iter_{}'.format(current_step),
+                        #         np.transpose(np.concatenate(
+                        #             (lr_img, hr_img, sr_img), axis=1), [2, 0, 1]),
+                        #         idx)
                         avg_psnr += calculate_psnr(sr_img, hr_img)
                         avg_ssim += calculate_ssim(sr_img, hr_img)
                         if 'SR_EMA' in visuals:

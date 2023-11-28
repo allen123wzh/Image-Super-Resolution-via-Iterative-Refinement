@@ -1,4 +1,4 @@
-name: ddim_INFER_m3fd_25M_512
+name: ddim_sr2x_INFER_m3fd_25M_1024
 # name: debug
 
 phase: test
@@ -14,13 +14,13 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: /media/user/990pro/allen/sr3_server4/m3fd_512_25M_E750
+  resume_state: E1000
 
 # Dataset settings
 datasets:
   test:
     name: m3fd_detection
-    dataroot: "data/fuse/m3fd_fusion_512_384"
+    dataroot: "data/fuse/m3fd_fusion_1024_768"
     batch_size: 1
     data_len: -1
     norm:
@@ -50,7 +50,7 @@ model:
     test:
       schedule: cosine
       n_timestep: 1000
-      ddim_timestep: 4
+      ddim_timestep: 10
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2      
       

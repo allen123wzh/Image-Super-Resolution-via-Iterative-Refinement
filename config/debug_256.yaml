@@ -21,7 +21,7 @@ datasets:
     batch_size: 4
     num_workers: 8
     shuffle: True
-    data_len: 60
+    data_len: 40
   val:
     name: CelebaHQ
     # mode: LRHR
@@ -40,11 +40,11 @@ model:
   unet:
     in_channel: 6
     out_channel: 3
-    inner_channel: 160
+    inner_channel: 128
     norm_groups: 32
     channel_multiplier: [1,1,2,2,4,4]
     attn_res: [8,16,32] # downsample, 32 means 256/32=8 actual res
-    res_blocks: 2
+    res_blocks: 1
     dropout: 0
   
   beta_schedule:
@@ -56,6 +56,7 @@ model:
     val:
       schedule: cosine
       n_timestep: 100
+      ddim_timestep: 20
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2      
       

@@ -17,7 +17,7 @@ def resize_and_convert(img, size, resample, center_crop=False):
         img = trans_fn.resize(img, size, resample)
         if center_crop:
             # img = trans_fn.center_crop(img, size)
-            img = trans_fn.center_crop(img, (384,512))
+            img = trans_fn.center_crop(img, (768,1024))
 
     return img    
 
@@ -242,9 +242,9 @@ def prepare(img_path, out_path, n_worker, sizes=(16, 128), resample=Image.BICUBI
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', '-p', type=str,
-                        default='/home/allen/Documents/MIE288/sr3_server4/data/fuse/m3fd_fusion/lr'.format(Path.home()))
+                        default='./data/fuse/m3fd_detect/lr'.format(Path.home()))
     parser.add_argument('--out', '-o', type=str,
-                        default='./data/fuse/m3fd_fusion')
+                        default='./data/fuse/m3fd_detect')
     parser.add_argument('--size', type=str, default='768,768')  # shorter edge
     parser.add_argument('--n_worker', type=int, default=40)
     parser.add_argument('--resample', type=str, default='bicubic')

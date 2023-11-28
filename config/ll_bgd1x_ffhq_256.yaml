@@ -1,6 +1,6 @@
-name: ll_2GN_bgd_64_1x_norm_adamW_1e-5_ffhq
+name: ll_srcnn_bgd1x256_512_adamW_1e-5_ffhq
 phase: train
-gpu_ids: [4,5,6,7]
+gpu_ids: [0,1,2,3,4,5,6,7]
 
 # Path for logs and checkpoints
 path:
@@ -9,15 +9,15 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: experiments/ll_2GN_bgd_64_1x_norm_adamW_1e-5_ffhq_231111_112433/checkpoint/E280
+  resume_state: experiments/ll_srcnn_bgd1x256_512_adamW_1e-5_ffhq_231126_095810/checkpoint/E70
 
 # Dataset settings
 datasets:
   train:
     name: FFHQ
     mode: HR
-    dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
-    batch_size: 8
+    dataroot: "data/dark/ffhq_512_512_gamma_1.5_1.7"
+    batch_size: 4
     num_workers: 8
     shuffle: True
     data_len: -1
@@ -27,9 +27,9 @@ datasets:
   val:
     name: CelebaHQ
     mode: LRHR
-    dataroot: "data/dark/celebahq_256_256_gamma_1.5_1.7"
+    dataroot: "data/dark/celebahq_512_512_gamma_1.5_1.7"
     batch_size: 1
-    data_len: 15
+    data_len: 100
     norm:
       lr_mean: [0.0789, 0.0594, 0.0520]
       lr_std: [0.0754, 0.0638, 0.0614]
@@ -37,13 +37,13 @@ datasets:
 # Model architecture
 model:
   which_model_G: ddpm
-  # finetune_norm: False
+  finetune_sr: False
   torch_compile: True
 
   unet:
     in_channel: 6
     out_channel: 3
-    inner_channel: 64
+    inner_channel: 256
     norm_groups: 16
     channel_multiplier: [1,1,2,2,4,4]
     attn_res: [8,16,32] # downsample, 32 means 256/32=8 actual res
@@ -54,6 +54,7 @@ model:
     train:
       schedule: cosine
       n_timestep: 1000
+      ddim_timestep: 20
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2
     val:
@@ -71,8 +72,8 @@ model:
 train:
   grad_accum: 1
   n_iter: 1000000
-  val_epoch_freq: 10
-  save_ckpt_epoch_freq: 10
+  val_epoch_freq: 5
+  save_ckpt_epoch_freq: 5
   print_freq: 200
 
   optimizer:

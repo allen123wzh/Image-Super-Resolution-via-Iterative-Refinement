@@ -9,7 +9,7 @@ import os
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/infer_ir_6M.yaml',
+    parser.add_argument('-c', '--config', type=str, default='config/infer_ir_25M.yaml',
                         help='YAML file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val', 'test'], default='test')
 
