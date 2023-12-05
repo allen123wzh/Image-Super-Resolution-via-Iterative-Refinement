@@ -245,16 +245,19 @@ class GaussianDiffusion(nn.Module):
     @torch.no_grad()
     def ddim_sample(self, x_in, continuous=False):
         batch, device, total_timesteps, sampling_timesteps = x_in.shape[0], self.betas.device, self.num_timesteps, self.ddim_timesteps
-        eta = 0 # control the noise injected to DDIM
+        eta = 1 # control the noise injected to DDIM
+
+        sample_inter = (1 | (sampling_timesteps//10))
 
         times = torch.linspace(-1, total_timesteps - 1, steps = sampling_timesteps + 1)   # [-1, 0, 1, 2, ..., T-1] when sampling_timesteps == total_timesteps
         times = list(reversed(times.int().tolist()))
         time_pairs = list(zip(times[:-1], times[1:])) # [(T-1, T-2), (T-2, T-3), ..., (1, 0), (0, -1)]
 
-        condition_rgb = x_in[:,:3,:,:]
-        img = torch.randn(condition_rgb.shape, device = device)
-        imgs = [condition_rgb]
+        ret_img = x_in[:,:3,:,:]
+        shape = ret_img.shape
+        img = torch.randn(shape, device = device)
 
+        i=1
         for time, time_next in tqdm(time_pairs, desc = 'sampling loop time step'):
             t = torch.full((batch,), time, device = device, dtype = torch.long)
             
@@ -264,16 +267,11 @@ class GaussianDiffusion(nn.Module):
 
             if self.global_corrector is not None:
                 x_start = self.global_corrector(x_start, t)
-                ######################
-                if time_next>=0:
-                    x_start = F.interpolate(x_start, scale_factor=0.5, mode='bicubic')
-                #####################
             x_start.clamp_(-1., 1.)
-
-            imgs.append(img)
 
             if time_next < 0:
                 img = x_start
+                ret_img = torch.cat([ret_img, img], dim=0)
                 continue
 
             alpha = self.alphas_cumprod[time]
@@ -287,9 +285,14 @@ class GaussianDiffusion(nn.Module):
             img = x_start * alpha_next.sqrt() + \
                   c * pred_noise + \
                   sigma * noise
-
-        ret = img if not continuous else torch.stack(imgs, dim = 0)
-        return ret
+            i += 1
+            if i % sample_inter == 0:
+                ret_img = torch.cat([ret_img, img], dim=0)
+        
+        if continuous:
+            return ret_img
+        else:
+            return ret_img[-1]
 
 
     @torch.no_grad()
@@ -322,9 +325,7 @@ class GaussianDiffusion(nn.Module):
 
 
     def p_losses(self, x_in, noise=None):
-        x_gt = x_in['HR']
-
-        x_start = F.interpolate(x_in['HR'], scale_factor=0.5, mode='bicubic')
+        x_start = x_in['HR']
         [b, c, h, w] = x_start.shape    # [B, 3, H, W]
         t = torch.randint(0, self.num_timesteps, (b,),
                           device=x_start.device).long()
@@ -339,13 +340,10 @@ class GaussianDiffusion(nn.Module):
             predicted_noise = self.denoise_fn(x_noisy, t)
         else:
             if 'IR' in x_in:
-                # lr = F.interpolate(x_in['LR'], scale_factor=0.5, mode='bicubic')
-                # ir = F.interpolate(x_in['IR'], scale_factor=0.5, mode='bicubic')           
                 predicted_noise = self.denoise_fn(                  # [B, 3, H, W]
                     torch.cat([x_in['LR'], x_in['IR'], x_noisy], dim=1), t
                 )
             else:
-                # lr = F.interpolate(x_in['LR'], scale_factor=0.5, mode='bicubic')
                 predicted_noise = self.denoise_fn(
                     torch.cat([x_in['LR'], x_noisy], dim=1), t
                     )         
@@ -364,8 +362,7 @@ class GaussianDiffusion(nn.Module):
             x_recon = self.global_corrector(x_recon, t)
             x_recon.clamp_(-1., 1.)
 
-            # l_recon = self.loss_func(x_recon, x_start)
-            l_recon = self.loss_func(x_recon, x_gt)
+            l_recon = self.loss_func(x_recon, x_start)
 
             return l_noise, l_recon
         else:

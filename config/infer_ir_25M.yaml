@@ -1,4 +1,4 @@
-name: ddim_sr2x_INFER_m3fd_25M_1024
+name: ddim_INFER_m3fd_25M
 # name: debug
 
 phase: test
@@ -14,7 +14,7 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: E1000
+  resume_state: m3fd_512_25M_E750
 
 # Dataset settings
 datasets:

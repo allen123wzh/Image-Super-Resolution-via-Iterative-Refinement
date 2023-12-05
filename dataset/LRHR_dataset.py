@@ -2,7 +2,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 import dataset.data_util as Util
 import torchvision.transforms as T
-import torch.nn.functional as F
+import torchvision.transforms.functional as F
 from pathlib import Path
 
 class LRHRDataset(Dataset):
@@ -46,14 +46,8 @@ class LRHRDataset(Dataset):
 
         img_orig_LR = Image.open(self.lr_path[index]).convert("RGB")
         fname = Path(self.lr_path[index]).stem
-        h, w = img_orig_LR.height, img_orig_LR.width
-        new_size = (int(w/2), int(h/2))
 
-        ####################
-        img_LR = Image.open(self.lr_path[index]).convert("RGB").resize(new_size, 3)
-        ####################
-        
-        img_LR = self.lr_transform(img_LR)
+        img_LR = self.lr_transform(img_orig_LR)
         img_orig_LR = self.hr_transform(img_orig_LR)
 
         if self.split != 'test':
@@ -63,9 +57,6 @@ class LRHRDataset(Dataset):
             if self.ir:
                 # img_IR = Image.open(self.ir_path[index]).convert("RGB")
                 img_IR = Image.open(self.ir_path[index]).convert("L")
-                ####################
-                img_IR = img_IR.resize(new_size, 3)
-                ####################
                 img_IR = self.ir_transform(img_IR)
                 return {'HR': img_HR, 'LR': img_LR, 'IR': img_IR, 'Index': index, "fname": fname}
             else:
@@ -74,9 +65,6 @@ class LRHRDataset(Dataset):
             if self.ir:
                 # img_IR = Image.open(self.ir_path[index]).convert("RGB")
                 img_IR = Image.open(self.ir_path[index]).convert("L")
-                ####################
-                img_IR = img_IR.resize(new_size, 3)
-                ####################
                 img_IR = self.ir_transform(img_IR)
                 return {'LR': img_LR, 'IR': img_IR, 'Index': index, "fname": fname}
             else:

@@ -9,7 +9,7 @@ import os
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/infer_ir_25M.yaml',
+    parser.add_argument('-c', '--config', type=str, default='config/infer.yaml',
                         help='YAML file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val', 'test'], default='test')
 
@@ -60,13 +60,13 @@ if __name__ == "__main__":
     for _,  test_data in enumerate(dataloader):
         idx += 1
         diffusion.feed_data(test_data)
-        diffusion.test(ddim=True, continous=False)
+        diffusion.test(ddim=True, continous=True)
         visuals = diffusion.get_current_visuals()
 
         lr_img = tensor2img(visuals['LR'])  # uint8
-        ir_img = tensor2img(visuals['IR'])  # uint8
+        # ir_img = tensor2img(visuals['IR'])  # uint8
 
-        sr_img_mode = 'single'
+        sr_img_mode = 'gride'
         if sr_img_mode == 'single':
             # single img series
             sr_img = visuals['SR']  # uint8

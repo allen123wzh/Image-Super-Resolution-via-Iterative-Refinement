@@ -1,4 +1,4 @@
-name: ll_srcnn_bgd1x256_512_adamW_1e-5_ffhq
+name: ll_bgd2x160_adamW_1e-5_ffhq
 phase: train
 gpu_ids: [0,1,2,3,4,5,6,7]
 
@@ -9,14 +9,14 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: experiments/ll_srcnn_bgd1x256_512_adamW_1e-5_ffhq_231126_095810/checkpoint/E70
+  resume_state: experiments/ll_bgd2x160_adamW_1e-5_ffhq_231204_191648/checkpoint/E185
 
 # Dataset settings
 datasets:
   train:
     name: FFHQ
     mode: HR
-    dataroot: "data/dark/ffhq_512_512_gamma_1.5_1.7"
+    dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
     batch_size: 4
     num_workers: 8
     shuffle: True
@@ -27,7 +27,7 @@ datasets:
   val:
     name: CelebaHQ
     mode: LRHR
-    dataroot: "data/dark/celebahq_512_512_gamma_1.5_1.7"
+    dataroot: "data/dark/celebahq_256_256_gamma_1.5_1.7"
     batch_size: 1
     data_len: 100
     norm:
@@ -43,18 +43,18 @@ model:
   unet:
     in_channel: 6
     out_channel: 3
-    inner_channel: 256
-    norm_groups: 16
+    inner_channel: 160
+    norm_groups: 32
     channel_multiplier: [1,1,2,2,4,4]
     attn_res: [8,16,32] # downsample, 32 means 256/32=8 actual res
-    res_blocks: 1
+    res_blocks: 2
     dropout: 0
 
   beta_schedule:
     train:
       schedule: cosine
       n_timestep: 1000
-      ddim_timestep: 20
+      ddim_timestep: 100
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2
     val:

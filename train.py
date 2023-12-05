@@ -129,15 +129,15 @@ if __name__ == "__main__":
                     for _,  val_data in enumerate(val_loader):
                         idx += 1
                         diffusion.feed_data(val_data)
-                        diffusion.test(ddim=True, continous=False)
+                        diffusion.test(ddim=True, continous=True)
                         visuals = diffusion.get_current_visuals()
-                        sr_img = tensor2img(visuals['SR'])  # uint8, super-res img
+                        sr_img = tensor2img(visuals['SR'][-1])  # uint8, super-res img
                         hr_img = tensor2img(visuals['HR'])  # uint8, GT hi-res
                         lr_img = tensor2img(visuals['LR'])  # uint8, Orig low-rs
                         if 'IR' in visuals:
                             ir_img = tensor2img(visuals['IR']) # uint8, IR
                         if 'SR_EMA' in visuals:
-                            sr_ema_img = tensor2img(visuals['SR_EMA'])  # uint8, super-res img
+                            sr_ema_img = tensor2img(visuals['SR_EMA'][-1])  # uint8, super-res img
 
 
                         save_img(hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
