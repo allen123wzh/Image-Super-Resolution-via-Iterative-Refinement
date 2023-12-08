@@ -65,14 +65,6 @@ class DDPM():
         self.set_loss()
         self.set_new_noise_schedule(
             opt['model']['beta_schedule'][opt['phase']], schedule_phase=[opt['phase']])
-        
-
-
-
-
-
-
-
 
         if self.opt['phase'] == 'train':
             self.netG.train()

@@ -1,6 +1,6 @@
 name: infer
 phase: test
-gpu_ids: [2]
+gpu_ids: [6]
 
 # Path for logs and checkpoints
 path:
