@@ -1,6 +1,10 @@
-name: ll_bgd1x256_adamW_1e-5_ffhq
+name: ll_99M_bgd1x256_adamW_1e-5_ffhq
 phase: train
-gpu_ids: [0,1,2,3,4,5]
+gpu_ids: [0,1,2,3,4,5,6,7]
+
+# Adding IR to the input
+ir: False
+sr: False
 
 # Path for logs and checkpoints
 path:
@@ -9,7 +13,7 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: experiments/ll_bgd1x256_adamW_1e-5_ffhq_231207_003312/checkpoint/E190
+  resume_state: experiments/ffhq_global_norm/ll_99M_bgd1x256_adamW_1e-5_ffhq/checkpoint/E235
   
 # Dataset settings
 datasets:
@@ -17,7 +21,7 @@ datasets:
     name: FFHQ
     mode: HR
     dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
-    batch_size: 5
+    batch_size: 4
     num_workers: 8
     shuffle: True
     data_len: -1
