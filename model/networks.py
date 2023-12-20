@@ -97,7 +97,7 @@ def define_G(opt):
         # image_size=model_opt['diffusion']['image_size']
     )
 
-    gc = global_corrector.GlobalCorrector(normal01=True)
+    gc = global_corrector.GlobalCorrector(normal01=True, sr=opt['sr'])
 
     netG = diffusion.GaussianDiffusion(
         denoise_fn=denoise_fn,
@@ -106,7 +106,8 @@ def define_G(opt):
         loss_type='l1',    # L1 or L2
         conditional=model_opt['diffusion']['conditional'],
         schedule_opt=model_opt['beta_schedule']['train'],
-        global_corrector=gc
+        global_corrector=gc,
+        sr=opt['sr']
     )
 
     if opt['phase'] == 'train':

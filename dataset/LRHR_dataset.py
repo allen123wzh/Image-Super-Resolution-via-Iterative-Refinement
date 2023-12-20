@@ -12,12 +12,14 @@ class LRHRDataset(Dataset):
                  lr_mean=[0.0789, 0.0594, 0.0520], lr_std=[0.0754, 0.0638, 0.0614], # FFHQ_LL
                  ir_mean=[0.44], ir_std=[0.1],
                  ir = False,
-                 instance_norm = True,
+                 sr = True,
+                 instance_norm = False,
                  data_len=-1):
 
         self.data_len = data_len
         self.split = split # 'train' 'val' 'test'
         self.ir = ir
+        self.sr = sr
         self.instance_norm = instance_norm
 
         self.lr_path = Util.get_paths_from_images(f'{dataroot}/lr')
@@ -70,6 +72,13 @@ class LRHRDataset(Dataset):
 
         img_orig_LR = Image.open(self.lr_path[index]).convert("RGB")
         fname = Path(self.lr_path[index]).stem
+        
+        ########################
+        h, w = img_orig_LR.height, img_orig_LR.width
+        new_size = (int(w/2), int(h/2))
+        if self.sr:
+            img_orig_LR = img_orig_LR.resize(new_size, 3)
+        ########################
 
         ##################
         if self.instance_norm:
@@ -88,12 +97,17 @@ class LRHRDataset(Dataset):
             if self.ir:
                 # img_IR = Image.open(self.ir_path[index]).convert("RGB")
                 img_IR = Image.open(self.ir_path[index]).convert("L")
+                #################
+                if self.sr:
+                    img_IR = img_IR.resize(new_size, 3)
+                #################
                 if self.instance_norm:
                     img_IR = F.to_tensor(img_IR)
                     ins_mean, ins_std = self.find_mean_std(img_IR)
                     img_IR = F.normalize(img_IR, ins_mean, ins_std)
                 else:
                     img_IR = self.ir_transform(img_IR)
+                
                 return {'HR': img_HR, 'LR': img_LR, 'IR': img_IR, 'Index': index, "fname": fname}
             else:
                 return {'HR': img_HR, 'LR': img_LR, 'Index': index, "fname": fname}
@@ -101,6 +115,10 @@ class LRHRDataset(Dataset):
             if self.ir:
                 # img_IR = Image.open(self.ir_path[index]).convert("RGB")
                 img_IR = Image.open(self.ir_path[index]).convert("L")
+                #################
+                if self.sr:
+                    img_IR = img_IR.resize(new_size, 3)
+                #################
                 if self.instance_norm:
                     img_IR = F.to_tensor(img_IR)
                     ins_mean, ins_std = self.find_mean_std(img_IR)

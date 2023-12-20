@@ -1,6 +1,10 @@
 name: debug
 phase: train
-gpu_ids: [0]
+gpu_ids: [1]
+
+# Adding IR to the input
+ir: False
+sr: False
 
 # Path for logs and checkpoints
 path:
@@ -29,7 +33,7 @@ datasets:
     # l_resolution: 256
     # r_resolution: 256
     batch_size: 1
-    data_len: 20
+    data_len: 2
 
 # Model architecture
 model:

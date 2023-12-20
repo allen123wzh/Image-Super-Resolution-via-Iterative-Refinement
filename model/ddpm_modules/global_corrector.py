@@ -61,7 +61,7 @@ class FeatureWiseAffine(nn.Module):
 
 # 3layers with control
 class GlobalCorrector(nn.Module):
-    def __init__(self, in_nc=3, out_nc=3, base_nf=64, cond_nf=32, act_type='relu', normal01=False):
+    def __init__(self, in_nc=3, out_nc=3, base_nf=64, cond_nf=32, act_type='relu', normal01=False, sr=False):
         super(GlobalCorrector, self).__init__()
 
         self.noise_level_mlp = nn.Sequential(
@@ -75,6 +75,7 @@ class GlobalCorrector(nn.Module):
         self.base_nf = base_nf
         self.out_nc = out_nc
         self.normal01 = normal01
+        self.sr = sr
 
         self.cond_net = Condition(in_nc=in_nc, nf=cond_nf)
       
@@ -85,13 +86,21 @@ class GlobalCorrector(nn.Module):
         self.cond_shift1 = nn.Linear(cond_nf, base_nf, bias=True)
         self.cond_shift2 = nn.Linear(cond_nf, base_nf, bias=True)
         self.cond_shift3 = nn.Linear(cond_nf, 3, bias=True)
-
-        self.conv1 = nn.Conv2d(in_nc, base_nf, 1, 1, bias=True) 
-        self.convt1 = FeatureWiseAffine(base_nf, base_nf)
-        self.conv2 = nn.Conv2d(base_nf, base_nf, 1, 1, bias=True)
-        self.convt2 = FeatureWiseAffine(base_nf, base_nf)
-        self.conv3 = nn.Conv2d(base_nf, out_nc, 1, 1, bias=True)
-        self.convt3 = FeatureWiseAffine(base_nf, out_nc)
+        
+        if sr:
+            self.conv1 = nn.Conv2d(in_nc, base_nf, kernel_size=9, stride=1, padding=4, bias=True) 
+            self.convt1 = FeatureWiseAffine(base_nf, base_nf)
+            self.conv2 = nn.Conv2d(base_nf, base_nf, kernel_size=5, stride=1, padding=2, bias=True)
+            self.convt2 = FeatureWiseAffine(base_nf, base_nf)
+            self.conv3 = nn.Conv2d(base_nf, out_nc, kernel_size=5, stride=1, padding=2, bias=True)
+            self.convt3 = FeatureWiseAffine(base_nf, out_nc)
+        else:
+            self.conv1 = nn.Conv2d(in_nc, base_nf, kernel_size=1, stride=1, padding=0, bias=True) 
+            self.convt1 = FeatureWiseAffine(base_nf, base_nf)
+            self.conv2 = nn.Conv2d(base_nf, base_nf, kernel_size=1, stride=1, padding=0, bias=True)
+            self.convt2 = FeatureWiseAffine(base_nf, base_nf)
+            self.conv3 = nn.Conv2d(base_nf, out_nc, kernel_size=1, stride=1, padding=0, bias=True)
+            self.convt3 = FeatureWiseAffine(base_nf, out_nc)
 
         if act_type == 'relu':
             self.act = nn.ReLU(inplace=True)
@@ -115,8 +124,17 @@ class GlobalCorrector(nn.Module):
 
         scale3 = self.cond_scale3(cond)
         shift3 = self.cond_shift3(cond)
-        
+
         # x [N, 3, H, W]
+        # out = self.in_conv(x)
+        # out = self.up_conv_1(out, t)       
+        # out = self.up_conv_2(out, t)
+        # out = self.conv1(out)         # [N, base_nf, H, W]
+
+        if self.sr:
+            x = F.interpolate(x, scale_factor=2, mode='bicubic')
+            # x.clamp_(0, 1.)
+
         out = self.conv1(x)         # [N, base_nf, H, W]
         out = self.convt1(out, t)   # [N, base_nf, H, W]
         out = out * scale1.view(-1, self.base_nf, 1, 1) + shift1.view(-1, self.base_nf, 1, 1) + out
@@ -132,4 +150,5 @@ class GlobalCorrector(nn.Module):
         out = out * scale3.view(-1, self.out_nc, 1, 1) + shift3.view(-1, self.out_nc, 1, 1) + out
         if self.normal01:
             out = 2 * out - 1
+
         return out                  # [N, 3, H, W]

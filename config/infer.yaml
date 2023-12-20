@@ -1,6 +1,8 @@
 name: infer
 phase: test
-gpu_ids: [6]
+gpu_ids: [7]
+
+sr: True
 
 # Path for logs and checkpoints
 path:
@@ -8,37 +10,37 @@ path:
   tb_logger: "tb_logger"
   results: "results"
   checkpoint: "checkpoint"
-  resume_state: ffhq_256_25M_E270
+  # resume_state: pretrained_weights/ffhq_256_58M_E250
+  resume_state: 58M_sr_E35
 
 # Dataset settings
 datasets:
   test:
     name: infer
-    dataroot: "data/dark/celebahq_256_256_gamma_1.5_1.7"
+    dataroot: "data/dark/celebahq_512_512_gamma_1.5_1.7"
     batch_size: 1
     data_len: 20
 
 # Model architecture
 model:
   which_model_G: ddpm
-  finetune_norm: False
-  torch_compile: True
+  torch_compile: False
 
   unet:
     in_channel: 6
     out_channel: 3
-    inner_channel: 128
+    inner_channel: 160
     norm_groups: 32
     channel_multiplier: [1,1,2,2,4,4]
     attn_res: [8,16,32]
-    res_blocks: 1
+    res_blocks: 2
     dropout: 0
   
   beta_schedule:
     test:
       schedule: cosine
       n_timestep: 1000
-      ddim_timestep: 100
+      ddim_timestep: 50
       linear_start: !!float 1e-6
       linear_end: !!float 1e-2      
       

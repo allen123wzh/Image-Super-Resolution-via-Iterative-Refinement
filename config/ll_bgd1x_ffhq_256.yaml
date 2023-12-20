@@ -1,10 +1,10 @@
-name: ll_99M_bgd1x256_adamW_1e-5_ffhq
+name: sr_ll_58M_955_bgd2x160_adamW_1e-5_ffhq
 phase: train
-gpu_ids: [0,1,2,3,4,5,6,7]
+gpu_ids: [0,1,2,3,4,5]
 
 # Adding IR to the input
 ir: False
-sr: False
+sr: True
 
 # Path for logs and checkpoints
 path:
@@ -13,15 +13,15 @@ path:
   results: "results"
   checkpoint: "checkpoint"
   # resume_state: null
-  resume_state: experiments/ffhq_global_norm/ll_99M_bgd1x256_adamW_1e-5_ffhq/checkpoint/E235
+  resume_state: experiments/sr_ll_58M_955_bgd2x160_adamW_1e-5_ffhq_231218_221322/checkpoint/E60
   
 # Dataset settings
 datasets:
   train:
     name: FFHQ
     mode: HR
-    dataroot: "data/dark/ffhq_256_256_gamma_1.5_1.7"
-    batch_size: 4
+    dataroot: "data/dark/ffhq_512_512_gamma_1.5_1.7"
+    batch_size: 5
     num_workers: 8
     shuffle: True
     data_len: -1
@@ -31,9 +31,9 @@ datasets:
   val:
     name: CelebaHQ
     mode: LRHR
-    dataroot: "data/dark/celebahq_256_256_gamma_1.5_1.7"
+    dataroot: "data/dark/celebahq_512_512_gamma_1.5_1.7"
     batch_size: 1
-    data_len: 100
+    data_len: 15
     norm:
       lr_mean: [0.0789, 0.0594, 0.0520]
       lr_std: [0.0754, 0.0638, 0.0614]
@@ -47,11 +47,11 @@ model:
   unet:
     in_channel: 6
     out_channel: 3
-    inner_channel: 256
+    inner_channel: 160
     norm_groups: 32
     channel_multiplier: [1,1,2,2,4,4]
     attn_res: [8,16,32] # downsample, 32 means 256/32=8 actual res
-    res_blocks: 1
+    res_blocks: 2
     dropout: 0
 
   beta_schedule:

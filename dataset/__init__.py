@@ -20,6 +20,7 @@ def create_dataset(dataset_opt, phase):
                                     ir_mean=dataset_opt['norm']['ir_mean'],
                                     ir_std=dataset_opt['norm']['ir_std'],
                                     ir=True,
+                                    sr=dataset_opt['sr'],
                                     data_len=dataset_opt['data_len'],
                                     )
         else:
@@ -29,12 +30,14 @@ def create_dataset(dataset_opt, phase):
                                     # hr_std=dataset_opt['norm']['hr_std'],
                                     lr_mean=dataset_opt['norm']['lr_mean'],
                                     lr_std=dataset_opt['norm']['lr_std'],
+                                    sr=dataset_opt['sr'],
                                     data_len=dataset_opt['data_len'],
                                     )
     else:
         dataset = LRHRDataset(dataroot=dataset_opt['dataroot'],
                                 split=phase,
                                 ir=dataset_opt['ir'],
+                                sr=dataset_opt['sr'],
                                 data_len=dataset_opt['data_len'],
                                 )
 

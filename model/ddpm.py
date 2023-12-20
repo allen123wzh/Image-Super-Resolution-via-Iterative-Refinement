@@ -388,7 +388,7 @@ class DDPM():
                 else:
                     del state_dict[key]
 
-            network.load_state_dict(state_dict, strict=False)
+            network.load_state_dict(state_dict, strict=True)
             logger.info('Weights loaded.')
 
             ### Optimizer

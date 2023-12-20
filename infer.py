@@ -23,6 +23,8 @@ if __name__ == "__main__":
 
     if opt['ir']:
         opt['datasets']['test']['ir'] = True
+    if opt['sr']:
+        opt['datasets']['test']['sr'] = True
 
     # Root logger 
     logger = setup_logger(None, local_rank=opt['local_rank'], phase=opt['phase'], 
@@ -60,13 +62,13 @@ if __name__ == "__main__":
     for _,  test_data in enumerate(dataloader):
         idx += 1
         diffusion.feed_data(test_data)
-        diffusion.test(ddim=True, continous=True)
+        diffusion.test(ddim=True, continous=False)
         visuals = diffusion.get_current_visuals()
 
         lr_img = tensor2img(visuals['LR'])  # uint8
         # ir_img = tensor2img(visuals['IR'])  # uint8
 
-        sr_img_mode = 'gride'
+        sr_img_mode = 'grid'
         if sr_img_mode == 'single':
             # single img series
             sr_img = visuals['SR']  # uint8

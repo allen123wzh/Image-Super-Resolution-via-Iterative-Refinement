@@ -18,8 +18,8 @@ if __name__ == "__main__":
                         # help='JSON file for configuration')
     parser.add_argument('-c', '--config', type=str, default='config/ll_bgd1x_ffhq_256.yaml',
                         help='JSON file for configuration')
-    # parser.add_argument('-c', '--config', type=str, default='config/debug_ir_256.yaml',
-    #                         help='JSON file for configuration')
+    # parser.add_argument('-c', '--config', type=str, default='config/debug_256.yaml',
+                            # help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                             help='Run either train(training) or val(generation)', default='train')
 
@@ -49,6 +49,9 @@ if __name__ == "__main__":
     if opt['ir']:
         opt['datasets']['train']['ir'] = True
         opt['datasets']['val']['ir'] = True
+    if opt['sr']:
+        opt['datasets']['train']['sr'] = True
+        opt['datasets']['val']['sr'] = True
 
     # Root logger 
     logger = setup_logger(None, local_rank=opt['local_rank'], phase='train', 
@@ -129,9 +132,9 @@ if __name__ == "__main__":
                     for _,  val_data in enumerate(val_loader):
                         idx += 1
                         diffusion.feed_data(val_data)
-                        diffusion.test(ddim=True, continous=True)
+                        diffusion.test(ddim=False, continous=False)
                         visuals = diffusion.get_current_visuals()
-                        sr_img = tensor2img(visuals['SR'][-1])  # uint8, super-res img
+                        sr_img = tensor2img(visuals['SR'])  # uint8, super-res img
                         hr_img = tensor2img(visuals['HR'])  # uint8, GT hi-res
                         lr_img = tensor2img(visuals['LR'])  # uint8, Orig low-rs
                         if 'IR' in visuals:
